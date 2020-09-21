@@ -45,14 +45,9 @@ var (
 )
 
 const (
-	// the parameter of the exponential distribution which defines the rate of sending by client
-	// the desiredRateParameter is the reciprocal of the expected value of the exponential distribution
-	desiredRateParameter = 0.2
-	loopRate             = 0.1
-	dropRate             = 0.1
-	// the rate at which clients are querying the provider for received packets. fetchRate value is the
-	// parameter of an exponential distribution, and is the reciprocal of the expected value of the exp. distribution
-	fetchRate = 0.01
+	// The parameters determine the start and the length of each round.
+	roundDuration			= 5 * time.Second
+	syncTime				= time.Unix(0, 0)
 )
 
 type Client interface {
@@ -343,7 +338,7 @@ func (c *client) controlOutQueue() error {
 			c.send(dummyPacket, c.Provider.Host, c.Provider.Port)
 			logLocal.Info("OutQueue empty. Dummy packet sent.")
 		}
-		err := delayBeforeContinute(desiredRateParameter)
+		err := delayBeforeContinute(roundDuration, syncTime)
 		if err != nil {
 			return err
 		}
@@ -357,7 +352,7 @@ func (c *client) controlMessagingFetching() {
 	for {
 		c.getMessagesFromProvider()
 		logLocal.Info("Sent request to provider to fetch messages")
-		err := delayBeforeContinute(fetchRate)
+		err := delayBeforeContinute(roundDuration, syncTime)
 		if err != nil {
 			logLocal.Error("Error in ControlMessagingFetching - generating random exp. value failed")
 		}
@@ -422,7 +417,7 @@ func (c *client) runLoopCoverTrafficStream() error {
 		}
 		c.send(loopPacket, c.Provider.Host, c.Provider.Port)
 		logLocal.Info("Loop message sent")
-		err = delayBeforeContinute(loopRate)
+		err = delayBeforeContinute(roundDuration, syncTime)
 		if err != nil {
 			return err
 		}
@@ -444,7 +439,7 @@ func (c *client) runDropCoverTrafficStream() error {
 		}
 		c.send(dropPacket, c.Provider.Host, c.Provider.Port)
 		logLocal.Info("Drop packet sent")
-		err = delayBeforeContinute(dropRate)
+		err = delayBeforeContinute(roundDuration, syncTime)
 		if err != nil {
 			return err
 		}
@@ -452,12 +447,11 @@ func (c *client) runDropCoverTrafficStream() error {
 	return nil
 }
 
-func delayBeforeContinute(rateParam float64) error {
-	delaySec, err := helpers.RandomExponential(rateParam)
-	if err != nil {
-		return err
-	}
-	time.Sleep(time.Duration(int64(delaySec*math.Pow10(9))) * time.Nanosecond)
+// delayBeforeContinue waits for the next round based on the system clock.
+func delayBeforeContinute(roundDuration time.Duration, syncTime time.Time) error {
+	currentTime := time.Now()
+	nextRoundTime := syncTime.Add(currentTime.Sub(syncTime).Truncate(roundDuration)).Add(roundDuration)
+	time.Sleep(nextRoundTime.Sub(currentTime))
 	return nil
 }
 
