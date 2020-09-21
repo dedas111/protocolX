@@ -16,10 +16,10 @@
 
 # This script should be run from inside the loopix-messaging package directory
 
-logDir="$(PWD)/logs"
-pkiDir="$(PWD)/pki/database.db"
+logDir="$(pwd)/logs"
+pkiDir="$(pwd)/pki/database.db"
 
-if [ -d $pkiDir ]
+if [ -f $pkiDir ]
 then
     echo "Removing the following directory" $pkiDir
     rm -f $pkiDir

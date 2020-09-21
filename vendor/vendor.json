@@ -41,6 +41,12 @@
 			"revisionTime": "2017-08-14T20:04:35Z"
 		},
 		{
+			"checksumSHA1": "5ANF5DkdOtBOcLbnktV+NKMUYp8=",
+			"path": "github.com/sirupsen/logrus",
+			"revision": "6699a89a232f3db797f2e280639854bbc4b89725",
+			"revisionTime": "2020-05-28T08:56:38Z"
+		},
+		{
 			"checksumSHA1": "mGbTYZ8dHVTiPTTJu3ktp+84pPI=",
 			"path": "github.com/stretchr/testify/assert",
 			"revision": "2aa2c176b9dab406a6970f6a55f513e8a8c8b18f",
@@ -51,6 +57,24 @@
 			"path": "golang.org/x/net/context",
 			"revision": "d866cfc389cec985d6fda2859936a575a55a3ab6",
 			"revisionTime": "2017-12-11T20:45:21Z"
+		},
+		{
+			"checksumSHA1": "Ld0iviZSRGAKK6WSoti+3++1RmY=",
+			"path": "golang.org/x/sys/internal/unsafeheader",
+			"revision": "efd3b9a0ff205c921c51961c1c9bb8728bd0ce1b",
+			"revisionTime": "2020-09-16T09:36:22Z"
+		},
+		{
+			"checksumSHA1": "Ygc0AlgJBFu4qeWID02GUPo5O4w=",
+			"path": "golang.org/x/sys/unix",
+			"revision": "efd3b9a0ff205c921c51961c1c9bb8728bd0ce1b",
+			"revisionTime": "2020-09-16T09:36:22Z"
+		},
+		{
+			"checksumSHA1": "nggOJ38p0IuHM75JDVwxY9EP82c=",
+			"path": "golang.org/x/sys/windows",
+			"revision": "efd3b9a0ff205c921c51961c1c9bb8728bd0ce1b",
+			"revisionTime": "2020-09-16T09:36:22Z"
 		}
 	],
 	"rootPath": "loopix-messaging"
