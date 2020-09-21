@@ -28,7 +28,6 @@ import (
 
 	"crypto/elliptic"
 	"crypto/rand"
-	"math"
 	"math/big"
 	"net"
 	"time"
@@ -42,12 +41,12 @@ var (
 	commFlag                = []byte{0xc6}
 	tokenFlag               = []byte{0xa9}
 	pullFlag                = []byte{0xff}
+	syncTime				= time.Unix(0, 0)
 )
 
 const (
-	// The parameters determine the start and the length of each round.
+	// The parameters determine the length of each round.
 	roundDuration			= 5 * time.Second
-	syncTime				= time.Unix(0, 0)
 )
 
 type Client interface {
