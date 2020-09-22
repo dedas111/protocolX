@@ -29,6 +29,8 @@ import (
 
 	"crypto/elliptic"
 	"errors"
+	
+	"time"
 )
 
 var logLocal = logging.PackageLogger()
@@ -52,9 +54,12 @@ type CryptoClient struct {
 	Network  NetworkPKI
 }
 
+var syncTime = time.Unix(0, 0)
+
 const (
-	desiredRateParameter = 5
-	pathLength           = 2
+	desiredRateParameter 	= 5
+	pathLength           	= 2
+	roundDuration			= 5 * time.Second
 )
 
 // CreateSphinxPacket responsible for sending a real message. Takes as input the message string
@@ -91,13 +96,31 @@ func (c *CryptoClient) createSphinxPacket(message string, recipient config.Clien
 // a sequence (of length pre-defined in a config file) of randomly
 // selected mixes and the recipient's provider
 func (c *CryptoClient) buildPath(recipient config.ClientConfig) (config.E2EPath, error) {
-	mixSeq, err := c.getRandomMixSequence(c.Network.Mixes, pathLength)
+	mixSeq, err := c.getReferenceMixSequence(c.Network.Mixes, pathLength)
 	if err != nil {
 		logLocal.WithError(err).Error("Error in buildPath - generating random mix path failed")
 		return config.E2EPath{}, err
 	}
 	path := config.E2EPath{IngressProvider: c.Provider, Mixes: mixSeq, EgressProvider: *recipient.Provider, Recipient: recipient}
 	return path, nil
+}
+
+func (c *CryptoClient) getReferenceMixSequence(mixes []config.MixConfig, length int) ([]config.MixConfig, error) {
+	var seq []config.MixConfig
+	round := c.getRound()
+	for i := 0; i < length; i++ {
+		seq = append(seq, mixes[c.getReferenceCharacter(round) % int64(len(mixes))])
+	}
+	return seq, nil
+}
+
+func (c *CryptoClient) getRound() int64 {
+	return int64(time.Now().Sub(syncTime) / roundDuration)
+}
+
+func (c *CryptoClient) getReferenceCharacter(index int64) int64 {
+	// TODO: Replace with real CRS implementation
+	return index
 }
 
 // getRandomMixSequence generates a random sequence of given length from all possible mixes.
