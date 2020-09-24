@@ -29,11 +29,14 @@ import (
 
 	"crypto/elliptic"
 	"errors"
-	
-	"time"
 )
 
 var logLocal = logging.PackageLogger()
+
+const (
+	desiredRateParameter	= 0.1
+	pathLength           	= 2
+)
 
 type NetworkPKI struct {
 	Mixes   []config.MixConfig
@@ -53,14 +56,6 @@ type CryptoClient struct {
 	Provider config.MixConfig
 	Network  NetworkPKI
 }
-
-var syncTime = time.Unix(0, 0)
-
-const (
-	desiredRateParameter 	= 5
-	pathLength           	= 2
-	roundDuration			= 5 * time.Second
-)
 
 // CreateSphinxPacket responsible for sending a real message. Takes as input the message string
 // and the public information about the destination.
@@ -107,20 +102,11 @@ func (c *CryptoClient) buildPath(recipient config.ClientConfig) (config.E2EPath,
 
 func (c *CryptoClient) getReferenceMixSequence(mixes []config.MixConfig, length int) ([]config.MixConfig, error) {
 	var seq []config.MixConfig
-	round := c.getRound()
+	round := config.GetRound()
 	for i := 0; i < length; i++ {
-		seq = append(seq, mixes[c.getReferenceCharacter(round) % int64(len(mixes))])
+		seq = append(seq, mixes[config.GetReferenceCharacter(round) % int64(len(mixes))])
 	}
 	return seq, nil
-}
-
-func (c *CryptoClient) getRound() int64 {
-	return int64(time.Now().Sub(syncTime) / roundDuration)
-}
-
-func (c *CryptoClient) getReferenceCharacter(index int64) int64 {
-	// TODO: Replace with real CRS implementation
-	return index
 }
 
 // getRandomMixSequence generates a random sequence of given length from all possible mixes.
@@ -162,7 +148,6 @@ func (c *CryptoClient) generateDelaySequence(desiredRateParameter float64, lengt
 // the message and the recipient's public configuration.
 // EncodeMessage returns the byte representation of the packet or an error if the packet could not be created.
 func (c *CryptoClient) EncodeMessage(message string, recipient config.ClientConfig) ([]byte, error) {
-
 	packet, err := c.createSphinxPacket(message, recipient)
 	if err != nil {
 		logLocal.WithError(err).Error("Error in EncodeMessage - the pack procedure failed")

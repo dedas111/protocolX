@@ -21,6 +21,8 @@ package config
 
 import (
 	"github.com/golang/protobuf/proto"
+	
+	"time"
 )
 
 func NewMixConfig(mixId, host, port string, pubKey []byte) MixConfig {
@@ -55,4 +57,20 @@ type E2EPath struct {
 
 func (p *E2EPath) Len() int {
 	return 3 + len(p.Mixes)
+}
+
+var SyncTime = time.Unix(0, 0)
+
+const (
+	PathLength           	= 2
+	RoundDuration			= 5 * time.Second
+)
+
+func GetRound() int64 {
+	return int64(time.Now().Sub(SyncTime) / RoundDuration)
+}
+
+func GetReferenceCharacter(index int64) int64 {
+	// TODO: Replace with real CRS implementation
+	return index
 }

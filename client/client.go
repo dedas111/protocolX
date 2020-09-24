@@ -30,6 +30,7 @@ import (
 	"crypto/rand"
 	"math/big"
 	"net"
+	
 	"time"
 )
 
@@ -41,12 +42,6 @@ var (
 	commFlag                = []byte{0xc6}
 	tokenFlag               = []byte{0xa9}
 	pullFlag                = []byte{0xff}
-	syncTime				= time.Unix(0, 0)
-)
-
-const (
-	// The parameters determine the length of each round.
-	roundDuration			= 5 * time.Second
 )
 
 type Client interface {
@@ -337,7 +332,7 @@ func (c *client) controlOutQueue() error {
 			c.send(dummyPacket, c.Provider.Host, c.Provider.Port)
 			logLocal.Info("OutQueue empty. Dummy packet sent.")
 		}
-		err := delayBeforeContinute(roundDuration, syncTime)
+		err := delayBeforeContinute(config.RoundDuration, config.SyncTime)
 		if err != nil {
 			return err
 		}
@@ -351,7 +346,7 @@ func (c *client) controlMessagingFetching() {
 	for {
 		c.getMessagesFromProvider()
 		logLocal.Info("Sent request to provider to fetch messages")
-		err := delayBeforeContinute(roundDuration, syncTime)
+		err := delayBeforeContinute(config.RoundDuration, config.SyncTime)
 		if err != nil {
 			logLocal.Error("Error in ControlMessagingFetching - generating random exp. value failed")
 		}
@@ -416,7 +411,7 @@ func (c *client) runLoopCoverTrafficStream() error {
 		}
 		c.send(loopPacket, c.Provider.Host, c.Provider.Port)
 		logLocal.Info("Loop message sent")
-		err = delayBeforeContinute(roundDuration, syncTime)
+		err = delayBeforeContinute(config.RoundDuration, config.SyncTime)
 		if err != nil {
 			return err
 		}
@@ -438,7 +433,7 @@ func (c *client) runDropCoverTrafficStream() error {
 		}
 		c.send(dropPacket, c.Provider.Host, c.Provider.Port)
 		logLocal.Info("Drop packet sent")
-		err = delayBeforeContinute(roundDuration, syncTime)
+		err = delayBeforeContinute(config.RoundDuration, config.SyncTime)
 		if err != nil {
 			return err
 		}
