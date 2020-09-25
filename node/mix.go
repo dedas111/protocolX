@@ -19,7 +19,6 @@ package node
 
 import (
 	"loopix-messaging/sphinx"
-	"time"
 )
 
 type Mix struct {
@@ -27,25 +26,29 @@ type Mix struct {
 	prvKey []byte
 }
 
+type MixPacket struct {
+	Data []byte
+	Adr sphinx.Hop
+	Flag string
+}
+
 // ProcessPacket performs the processing operation on the received packet, including cryptographic operations and
 // extraction of the meta information.
-func (m *Mix) ProcessPacket(packet []byte, c chan<- []byte, cAdr chan<- sphinx.Hop, cFlag chan<- string, errCh chan<- error) {
+func (m *Mix) ProcessPacket(packet []byte, c chan<- MixPacket, errCh chan<- error) {
 
 	nextHop, commands, newPacket, err := sphinx.ProcessSphinxPacket(packet, m.prvKey)
 	if err != nil {
 		errCh <- err
 	}
 
-	timeoutCh := make(chan []byte, 1)
+	timeoutCh := make(chan MixPacket, 1)
 
-	go func(p []byte, delay float64) {
-		time.Sleep(time.Second * time.Duration(delay))
+	go func(p MixPacket, delay float64) {
+		// time.Sleep(time.Second * time.Duration(delay))
 		timeoutCh <- p
-	}(newPacket, commands.Delay)
+	}(MixPacket{newPacket, nextHop, string(commands.Flag)}, commands.Delay)
 
 	c <- <-timeoutCh
-	cAdr <- nextHop
-	cFlag <- string(commands.Flag)
 	errCh <- nil
 
 }

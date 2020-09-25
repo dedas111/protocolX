@@ -1,4 +1,4 @@
 vendor/github.com
 vendor/golang.org
-inbox/*
+inboxes/*
 logs/*

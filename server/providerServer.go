@@ -19,7 +19,6 @@ import (
 	"loopix-messaging/helpers"
 	"loopix-messaging/networker"
 	"loopix-messaging/node"
-	"loopix-messaging/sphinx"
 
 	"github.com/golang/protobuf/proto"
 
@@ -29,6 +28,9 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	
+	"sync"
+	"math/rand"
 )
 
 var (
@@ -54,6 +56,10 @@ type ProviderServer struct {
 
 	assignedClients map[string]ClientRecord
 	config          config.MixConfig
+	
+	cPac chan node.MixPacket
+	aPac []node.MixPacket
+	mutex sync.Mutex
 }
 
 type ClientRecord struct {
@@ -68,8 +74,9 @@ type ClientRecord struct {
 // and starts the listening server. Function returns an error
 // signaling whether any operation was unsuccessful
 func (p *ProviderServer) Start() error {
+	p.cPac = make(chan node.MixPacket)
+	p.aPac = make([]node.MixPacket, 0)
 	p.run()
-
 	return nil
 }
 
@@ -88,6 +95,11 @@ func (p *ProviderServer) run() {
 		p.listenForIncomingConnections()
 	}()
 
+	go func() {
+		logLocal.Infof("Preparing for relaying")
+		p.relayPacket()
+	}()
+	
 	<-finish
 }
 
@@ -97,36 +109,16 @@ func (p *ProviderServer) run() {
 func (p *ProviderServer) receivedPacket(packet []byte) error {
 	logLocal.Info("Received new sphinx packet")
 
-	c := make(chan []byte)
-	cAdr := make(chan sphinx.Hop)
-	cFlag := make(chan string)
 	errCh := make(chan error)
 
-	go p.ProcessPacket(packet, c, cAdr, cFlag, errCh)
-	dePacket := <-c
-	nextHop := <-cAdr
-	flag := <-cFlag
+	go p.ProcessPacket(packet, p.cPac, errCh)
+	p.mutex.Lock()
+	p.aPac = append(p.aPac, <-p.cPac)
 	err := <-errCh
-
 	if err != nil {
 		return err
 	}
-
-	switch flag {
-	case "\xF1":
-		err = p.forwardPacket(dePacket, nextHop.Address)
-		if err != nil {
-			return err
-		}
-	case "\xF0":
-		err = p.storeMessage(dePacket, nextHop.Id, "TMP_MESSAGE_ID")
-		if err != nil {
-			return err
-		}
-	default:
-		logLocal.Info("Sphinx packet flag not recognised")
-	}
-
+	p.mutex.Unlock()
 	return nil
 }
 
@@ -179,6 +171,33 @@ func (p *ProviderServer) listenForIncomingConnections() {
 				logLocal.WithError(err).Error(err)
 			}
 		}
+	}
+}
+
+func (p *ProviderServer) relayPacket() error {
+	for {
+		delayBeforeContinute(config.RoundDuration, config.SyncTime)
+		p.mutex.Lock()
+		rand.Shuffle(len(p.aPac), func(i, j int) { p.aPac[i], p.aPac[j] = p.aPac[j], p.aPac[i] })
+		for _, pp := range p.aPac {
+			var err error
+			switch pp.Flag {
+			case "\xF1":
+				err = p.forwardPacket(pp.Data, pp.Adr.Address)
+				if err != nil {
+					return err
+				}
+			case "\xF0":
+				err = p.storeMessage(pp.Data, pp.Adr.Id, "TMP_MESSAGE_ID")
+				if err != nil {
+					return err
+				}
+			default:
+				logLocal.Info("Sphinx packet flag not recognised")
+			}
+		}
+		p.aPac = p.aPac[0:0]
+		p.mutex.Unlock()
 	}
 }
 

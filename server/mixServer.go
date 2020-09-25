@@ -23,11 +23,14 @@ import (
 	"loopix-messaging/logging"
 	"loopix-messaging/networker"
 	"loopix-messaging/node"
-	"loopix-messaging/sphinx"
 
 	"net"
 
 	"github.com/golang/protobuf/proto"
+	
+	"sync"
+	"time"
+	"math/rand"
 )
 
 var logLocal = logging.PackageLogger()
@@ -47,9 +50,15 @@ type MixServer struct {
 	*node.Mix
 
 	config config.MixConfig
+	
+	cPac chan node.MixPacket 
+	aPac []node.MixPacket
+	mutex sync.Mutex
 }
 
 func (m *MixServer) Start() error {
+	m.cPac = make(chan node.MixPacket)
+	m.aPac = make([]node.MixPacket, 0)
 	defer m.run()
 	return nil
 }
@@ -61,26 +70,16 @@ func (m *MixServer) GetConfig() config.MixConfig {
 func (m *MixServer) receivedPacket(packet []byte) error {
 	logLocal.Info("Received new sphinx packet")
 
-	c := make(chan []byte)
-	cAdr := make(chan sphinx.Hop)
-	cFlag := make(chan string)
 	errCh := make(chan error)
 
-	go m.ProcessPacket(packet, c, cAdr, cFlag, errCh)
-	dePacket := <-c
-	nextHop := <-cAdr
-	flag := <-cFlag
+	go m.ProcessPacket(packet, m.cPac, errCh)
+	m.mutex.Lock()
+	m.aPac = append(m.aPac, <-m.cPac)
 	err := <-errCh
-
 	if err != nil {
 		return err
 	}
-
-	if flag == "\xF1" {
-		m.forwardPacket(dePacket, nextHop.Address)
-	} else {
-		logLocal.Info("Packet has non-forward flag. Packet dropped")
-	}
+	m.mutex.Unlock()
 	return nil
 }
 
@@ -122,6 +121,11 @@ func (m *MixServer) run() {
 		m.listenForIncomingConnections()
 	}()
 
+	go func() {
+		logLocal.Infof("Preparing for relaying")
+		m.relayPacket()
+	}()
+	
 	<-finish
 }
 
@@ -141,6 +145,30 @@ func (m *MixServer) listenForIncomingConnections() {
 			}
 		}
 	}
+}
+
+func (m *MixServer) relayPacket() {
+	for {
+		delayBeforeContinute(config.RoundDuration, config.SyncTime)
+		m.mutex.Lock()
+		rand.Shuffle(len(m.aPac), func(i, j int) { m.aPac[i], m.aPac[j] = m.aPac[j], m.aPac[i] })
+		for _, p := range m.aPac {
+			if p.Flag == "\xF1" {
+				m.forwardPacket(p.Data, p.Adr.Address)
+			} else {
+				logLocal.Info("Packet has non-forward flag. Packet dropped")
+			}
+		}
+		m.aPac = m.aPac[0:0]
+		m.mutex.Unlock()
+	}
+}
+
+func delayBeforeContinute(roundDuration time.Duration, syncTime time.Time) error {
+	currentTime := time.Now()
+	nextRoundTime := syncTime.Add(currentTime.Sub(syncTime).Truncate(roundDuration)).Add(roundDuration)
+	time.Sleep(nextRoundTime.Sub(currentTime))
+	return nil
 }
 
 func (m *MixServer) handleConnection(conn net.Conn, errs chan<- error) {
