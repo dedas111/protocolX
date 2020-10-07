@@ -45,10 +45,11 @@ func createTestProvider() (*ProviderServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	node := node.NewMix(pub, priv)
-	provider := ProviderServer{host: "localhost", port: "9999", Mix: node}
+	n := node.NewMix(pub, priv)
+	provider := ProviderServer{host: "localhost", port: "9999", Mix: n}
 	provider.config = config.MixConfig{Id: provider.id, Host: provider.host, Port: provider.port, PubKey: provider.GetPublicKey()}
 	provider.assignedClients = make(map[string]ClientRecord)
+	provider.aPac = make([]node.MixPacket, 0)
 	return &provider, nil
 }
 
@@ -57,9 +58,10 @@ func createTestMixnode() (*MixServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	node := node.NewMix(pub, priv)
-	mix := MixServer{host: "localhost", port: "9995", Mix: node}
+	n := node.NewMix(pub, priv)
+	mix := MixServer{host: "localhost", port: "9995", Mix: n}
 	mix.config = config.MixConfig{Id: mix.id, Host: mix.host, Port: mix.port, PubKey: mix.GetPublicKey()}
+	mix.aPac = make([]node.MixPacket, 0)
 	addr, err := helpers.ResolveTCPAddress(mix.host, mix.port)
 	if err != nil {
 		return nil, err

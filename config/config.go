@@ -63,7 +63,7 @@ var SyncTime = time.Unix(0, 0)
 
 const (
 	PathLength           	= 2
-	RoundDuration			= 5 * time.Second
+	RoundDuration			= 100 * time.Millisecond
 )
 
 func GetRound() int64 {

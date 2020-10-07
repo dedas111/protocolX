@@ -51,13 +51,11 @@ type MixServer struct {
 
 	config config.MixConfig
 	
-	cPac chan node.MixPacket 
 	aPac []node.MixPacket
 	mutex sync.Mutex
 }
 
 func (m *MixServer) Start() error {
-	m.cPac = make(chan node.MixPacket)
 	m.aPac = make([]node.MixPacket, 0)
 	defer m.run()
 	return nil
@@ -70,15 +68,16 @@ func (m *MixServer) GetConfig() config.MixConfig {
 func (m *MixServer) receivedPacket(packet []byte) error {
 	logLocal.Info("Received new sphinx packet")
 
+	cPac := make(chan node.MixPacket)
 	errCh := make(chan error)
 
-	go m.ProcessPacket(packet, m.cPac, errCh)
-	m.mutex.Lock()
-	m.aPac = append(m.aPac, <-m.cPac)
+	go m.ProcessPacket(packet, cPac, errCh)
 	err := <-errCh
 	if err != nil {
 		return err
 	}
+	m.mutex.Lock()
+	m.aPac = append(m.aPac, <-cPac)
 	m.mutex.Unlock()
 	return nil
 }

@@ -74,9 +74,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestMixProcessPacket(t *testing.T) {
-	ch := make(chan []byte, 1)
-	chHop := make(chan sphinx.Hop, 1)
-	cAdr := make(chan string, 1)
+	ch := make(chan MixPacket, 1)
 	errCh := make(chan error, 1)
 
 	pubD, _, err := sphinx.GenerateKeyPair()
@@ -105,16 +103,14 @@ func TestMixProcessPacket(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	providerWorker.ProcessPacket(testPacketBytes, ch, chHop, cAdr, errCh)
+	providerWorker.ProcessPacket(testPacketBytes, ch, errCh)
 	dePacket := <-ch
-	nextHop := <-chHop
-	flag := <-cAdr
 	err = <-errCh
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, sphinx.Hop{Id: "Mix1", Address: "localhost:3330", PubKey: nodes[0].PubKey}, nextHop, "Next hop does not match")
-	assert.Equal(t, reflect.TypeOf([]byte{}), reflect.TypeOf(dePacket))
-	assert.Equal(t, "\xF1", flag, reflect.TypeOf(dePacket))
+	assert.Equal(t, sphinx.Hop{Id: "Mix1", Address: "localhost:3330", PubKey: nodes[0].PubKey}, dePacket.Adr, "Next hop does not match")
+	assert.Equal(t, reflect.TypeOf([]byte{}), reflect.TypeOf(dePacket.Data))
+	assert.Equal(t, "\xF1", dePacket.Flag, reflect.TypeOf(dePacket.Data))
 }

@@ -35,10 +35,11 @@ type MixPacket struct {
 // ProcessPacket performs the processing operation on the received packet, including cryptographic operations and
 // extraction of the meta information.
 func (m *Mix) ProcessPacket(packet []byte, c chan<- MixPacket, errCh chan<- error) {
-
+	
 	nextHop, commands, newPacket, err := sphinx.ProcessSphinxPacket(packet, m.prvKey)
 	if err != nil {
 		errCh <- err
+		return
 	}
 
 	timeoutCh := make(chan MixPacket, 1)
@@ -48,8 +49,8 @@ func (m *Mix) ProcessPacket(packet []byte, c chan<- MixPacket, errCh chan<- erro
 		timeoutCh <- p
 	}(MixPacket{newPacket, nextHop, string(commands.Flag)}, commands.Delay)
 
-	c <- <-timeoutCh
 	errCh <- nil
+	c <- <-timeoutCh
 
 }
 

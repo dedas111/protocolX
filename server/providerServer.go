@@ -57,7 +57,6 @@ type ProviderServer struct {
 	assignedClients map[string]ClientRecord
 	config          config.MixConfig
 	
-	cPac chan node.MixPacket
 	aPac []node.MixPacket
 	mutex sync.Mutex
 }
@@ -74,7 +73,6 @@ type ClientRecord struct {
 // and starts the listening server. Function returns an error
 // signaling whether any operation was unsuccessful
 func (p *ProviderServer) Start() error {
-	p.cPac = make(chan node.MixPacket)
 	p.aPac = make([]node.MixPacket, 0)
 	p.run()
 	return nil
@@ -109,15 +107,16 @@ func (p *ProviderServer) run() {
 func (p *ProviderServer) receivedPacket(packet []byte) error {
 	logLocal.Info("Received new sphinx packet")
 
+	cPac := make(chan node.MixPacket)
 	errCh := make(chan error)
 
-	go p.ProcessPacket(packet, p.cPac, errCh)
-	p.mutex.Lock()
-	p.aPac = append(p.aPac, <-p.cPac)
+	go p.ProcessPacket(packet, cPac, errCh)
 	err := <-errCh
 	if err != nil {
 		return err
 	}
+	p.mutex.Lock()
+	p.aPac = append(p.aPac, <-cPac)
 	p.mutex.Unlock()
 	return nil
 }
@@ -185,11 +184,13 @@ func (p *ProviderServer) relayPacket() error {
 			case "\xF1":
 				err = p.forwardPacket(pp.Data, pp.Adr.Address)
 				if err != nil {
+					p.mutex.Unlock()
 					return err
 				}
 			case "\xF0":
 				err = p.storeMessage(pp.Data, pp.Adr.Id, "TMP_MESSAGE_ID")
 				if err != nil {
+					p.mutex.Unlock()
 					return err
 				}
 			default:
