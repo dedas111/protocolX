@@ -15,8 +15,8 @@
 package node
 
 import (
-	"loopix-messaging/config"
-	sphinx "loopix-messaging/sphinx"
+	"github.com/dedas111/protocolX/config"
+	sphinx "github.com/dedas111/protocolX/sphinx"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"

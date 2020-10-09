@@ -18,7 +18,7 @@
 package node
 
 import (
-	"loopix-messaging/sphinx"
+	"github.com/dedas111/protocolX/sphinx"
 )
 
 type Mix struct {

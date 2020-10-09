@@ -20,8 +20,8 @@
 package sphinx
 
 import (
-	"loopix-messaging/config"
-	"loopix-messaging/logging"
+	"github.com/dedas111/protocolX/config"
+	"github.com/dedas111/protocolX/logging"
 
 	"crypto/aes"
 	"crypto/cipher"

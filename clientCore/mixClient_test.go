@@ -15,8 +15,8 @@
 package clientCore
 
 import (
-	"loopix-messaging/config"
-	sphinx "loopix-messaging/sphinx"
+	"github.com/dedas111/protocolX/config"
+	sphinx "github.com/dedas111/protocolX/sphinx"
 
 	"github.com/stretchr/testify/assert"
 

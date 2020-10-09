@@ -15,17 +15,17 @@
 package main
 
 import (
-	"loopix-messaging/client"
-	"loopix-messaging/config"
-	"loopix-messaging/logging"
-	"loopix-messaging/pki"
-	"loopix-messaging/server"
-	"loopix-messaging/sphinx"
+	"github.com/dedas111/protocolX/client"
+	"github.com/dedas111/protocolX/config"
+	"github.com/dedas111/protocolX/logging"
+	"github.com/dedas111/protocolX/pki"
+	"github.com/dedas111/protocolX/server"
+	"github.com/dedas111/protocolX/sphinx"
 
 	"flag"
 	"fmt"
 
-	"loopix-messaging/helpers"
+	"github.com/dedas111/protocolX/helpers"
 
 	"github.com/golang/protobuf/proto"
 )

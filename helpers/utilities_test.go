@@ -15,7 +15,7 @@
 package helpers
 
 import (
-	"loopix-messaging/config"
+	"github.com/dedas111/protocolX/config"
 
 	"github.com/stretchr/testify/assert"
 

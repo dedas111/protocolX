@@ -19,8 +19,8 @@
 package helpers
 
 import (
-	"loopix-messaging/config"
-	"loopix-messaging/pki"
+	"github.com/dedas111/protocolX/config"
+	"github.com/dedas111/protocolX/pki"
 
 	"github.com/golang/protobuf/proto"
 

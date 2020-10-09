@@ -18,11 +18,11 @@
 package client
 
 import (
-	"loopix-messaging/clientCore"
-	"loopix-messaging/config"
-	"loopix-messaging/helpers"
-	"loopix-messaging/logging"
-	"loopix-messaging/networker"
+	"github.com/dedas111/protocolX/clientCore"
+	"github.com/dedas111/protocolX/config"
+	"github.com/dedas111/protocolX/helpers"
+	"github.com/dedas111/protocolX/logging"
+	"github.com/dedas111/protocolX/networker"
 
 	"github.com/golang/protobuf/proto"
 

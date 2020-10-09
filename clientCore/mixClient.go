@@ -20,10 +20,10 @@
 package clientCore
 
 import (
-	"loopix-messaging/config"
-	"loopix-messaging/helpers"
-	"loopix-messaging/logging"
-	sphinx "loopix-messaging/sphinx"
+	"github.com/dedas111/protocolX/config"
+	"github.com/dedas111/protocolX/helpers"
+	"github.com/dedas111/protocolX/logging"
+	sphinx "github.com/dedas111/protocolX/sphinx"
 
 	"github.com/golang/protobuf/proto"
 
