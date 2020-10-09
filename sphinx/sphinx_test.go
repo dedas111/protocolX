@@ -15,7 +15,7 @@
 package sphinx
 
 import (
-	"loopix-messaging/config"
+	"github.com/dedas111/protocolX/config"
 
 	"crypto/aes"
 	"crypto/elliptic"
