@@ -36,12 +36,13 @@ import (
 
 var (
 	logLocal                = logging.PackageLogger()
-	loopCoverTrafficEnabled = true
-	dropCoverTrafficEnabled = true
+	loopCoverTrafficEnabled = false
+	dropCoverTrafficEnabled = false
 	assignFlag              = []byte{0xA2}
 	commFlag                = []byte{0xc6}
 	tokenFlag               = []byte{0xa9}
 	pullFlag                = []byte{0xff}
+	packetsSent				= 0
 )
 
 type Client interface {
@@ -224,13 +225,13 @@ func (c *client) handleConnection(conn net.Conn) {
 			}
 		}()
 
-		if loopCoverTrafficEnabled {
-			c.turnOnLoopCoverTraffic()
-		}
+		// if loopCoverTrafficEnabled {
+		// 	c.turnOnLoopCoverTraffic()
+		// }
 
-		if dropCoverTrafficEnabled {
-			c.turnOnDropCoverTraffic()
-		}
+		// if dropCoverTrafficEnabled {
+		// 	c.turnOnDropCoverTraffic()
+		// }
 
 		go func() {
 			c.controlMessagingFetching()
@@ -319,23 +320,41 @@ func (c *client) getMessagesFromProvider() error {
 // drop cover message is sent instead.
 func (c *client) controlOutQueue() error {
 	logLocal.Info("Queue controller started")
-	for {
+	err := delayBeforeContinute(config.RoundDuration, config.SyncTime)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < 50; i++ {
 		select {
 		case realPacket := <-c.outQueue:
 			c.send(realPacket, c.Provider.Host, c.Provider.Port)
-			logLocal.Info("Real packet was sent")
+			logLocal.Info("Real packet was sent at ", (time.Now()).String())
+			packetsSent = packetsSent +1
+			logLocal.Info("Packet sent = ", packetsSent)
 		default:
 			dummyPacket, err := c.createDropCoverMessage()
 			if err != nil {
 				return err
 			}
 			c.send(dummyPacket, c.Provider.Host, c.Provider.Port)
-			logLocal.Info("OutQueue empty. Dummy packet sent.")
+			logLocal.Info("OutQueue empty. Dummy packet sent at ", (time.Now()).String())
+			packetsSent = packetsSent +1
+			logLocal.Info("Packet sent = ", packetsSent)
+
+			// dummyPacket2, err2 := c.createDropCoverMessage()
+			// if err2 != nil {
+			// 	return err2
+			// }
+			// c.send(dummyPacket2, c.Provider.Host, c.Provider.Port)
+			// logLocal.Info("OutQueue empty. Dummy packet sent at ", (time.Now()).String())
+			// packetsSent = packetsSent +1
+			// logLocal.Info("Packet sent = ", packetsSent)
 		}
-		err := delayBeforeContinute(config.RoundDuration, config.SyncTime)
-		if err != nil {
-			return err
-		}
+		// err := delayBeforeContinute(config.ClientDuration, config.SyncTime)
+		// if err != nil {
+		// 	return err
+		// }
 	}
 	return nil
 }
@@ -343,7 +362,7 @@ func (c *client) controlOutQueue() error {
 // controlMessagingFetching periodically at random sends a query to the provider
 // to fetch received messages
 func (c *client) controlMessagingFetching() {
-	for {
+	for i := 0; i < 50; i++ {
 		c.getMessagesFromProvider()
 		logLocal.Info("Sent request to provider to fetch messages")
 		err := delayBeforeContinute(config.RoundDuration, config.SyncTime)

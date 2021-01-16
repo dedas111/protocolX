@@ -41,16 +41,9 @@ func (m *Mix) ProcessPacket(packet []byte, c chan<- MixPacket, errCh chan<- erro
 		errCh <- err
 		return
 	}
-
-	timeoutCh := make(chan MixPacket, 1)
-
-	go func(p MixPacket, delay float64) {
-		// time.Sleep(time.Second * time.Duration(delay))
-		timeoutCh <- p
-	}(MixPacket{newPacket, nextHop, string(commands.Flag)}, commands.Delay)
-
+	
 	errCh <- nil
-	c <- <-timeoutCh
+	c <- MixPacket{newPacket, nextHop, string(commands.Flag)}
 
 }
 

@@ -34,6 +34,8 @@ import (
 )
 
 var logLocal = logging.PackageLogger()
+var processedPackets = 0
+var packetsRelayed = 0
 
 type MixServerIt interface {
 	networker.NetworkServer
@@ -66,7 +68,7 @@ func (m *MixServer) GetConfig() config.MixConfig {
 }
 
 func (m *MixServer) receivedPacket(packet []byte) error {
-	logLocal.Info("Received new sphinx packet")
+	logLocal.Info("Received new sphinx packet at", (time.Now()).String())
 
 	cPac := make(chan node.MixPacket)
 	errCh := make(chan error)
@@ -79,6 +81,9 @@ func (m *MixServer) receivedPacket(packet []byte) error {
 	m.mutex.Lock()
 	m.aPac = append(m.aPac, <-cPac)
 	m.mutex.Unlock()
+	logLocal.Info("Processed the sphinx packet at", (time.Now()).String())
+	processedPackets = processedPackets +1
+	logLocal.Info("Total packets processed = ", processedPackets)
 	return nil
 }
 
@@ -154,6 +159,8 @@ func (m *MixServer) relayPacket() {
 		for _, p := range m.aPac {
 			if p.Flag == "\xF1" {
 				m.forwardPacket(p.Data, p.Adr.Address)
+				packetsRelayed = packetsRelayed +1
+				logLocal.Info("Total number of packets relayed", packetsRelayed)
 			} else {
 				logLocal.Info("Packet has non-forward flag. Packet dropped")
 			}
@@ -168,6 +175,12 @@ func delayBeforeContinute(roundDuration time.Duration, syncTime time.Time) error
 	nextRoundTime := syncTime.Add(currentTime.Sub(syncTime).Truncate(roundDuration)).Add(roundDuration)
 	time.Sleep(nextRoundTime.Sub(currentTime))
 	return nil
+}
+
+func GetRemainingRoundTime(roundDuration time.Duration, syncTime time.Time) int64 {
+	currentTime := time.Now()
+	nextRoundTime := syncTime.Add(currentTime.Sub(syncTime).Truncate(roundDuration)).Add(roundDuration)
+	return int64(nextRoundTime.Sub(currentTime))
 }
 
 func (m *MixServer) handleConnection(conn net.Conn, errs chan<- error) {

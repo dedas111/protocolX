@@ -64,11 +64,18 @@ var SyncTime = time.Unix(0, 0)
 const (
 	PathLength           	= 2
 	RoundDuration			= 100 * time.Millisecond
+	ClientDuration			= 1 * time.Millisecond
 )
 
 func GetRound() int64 {
 	return int64(time.Now().Sub(SyncTime) / RoundDuration)
 }
+
+/* func GetRemainingRoundTime() int64 {
+	currentTime := time.Now()
+	nextRoundTime := syncTime.Add(currentTime.Sub(syncTime).Truncate(roundDuration)).Add(roundDuration)
+	return int64(nextRoundTime.Sub(currentTime))
+} */
 
 func GetReferenceCharacter(index int64) int64 {
 	// TODO: Replace with real CRS implementation

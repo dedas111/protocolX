@@ -30,6 +30,7 @@ import (
 	"os"
 	
 	"sync"
+	"time"
 	"math/rand"
 )
 
@@ -38,6 +39,8 @@ var (
 	commFlag   = []byte{0xc6}
 	tokenFlag  = []byte{0xa9}
 	pullFlag   = []byte{0xff}
+	handledPackets = 0
+	relayedPackets = 0
 )
 
 type ProviderIt interface {
@@ -107,6 +110,11 @@ func (p *ProviderServer) run() {
 func (p *ProviderServer) receivedPacket(packet []byte) error {
 	logLocal.Info("Received new sphinx packet")
 
+	if GetRemainingRoundTime(config.RoundDuration, config.SyncTime) < int64(20 * time.Millisecond) {
+		logLocal.Info("Packet dropped, because received at", (time.Now()).String())
+		return nil
+	}
+
 	cPac := make(chan node.MixPacket)
 	errCh := make(chan error)
 
@@ -115,9 +123,12 @@ func (p *ProviderServer) receivedPacket(packet []byte) error {
 	if err != nil {
 		return err
 	}
-	p.mutex.Lock()
+	// p.mutex.Lock()
 	p.aPac = append(p.aPac, <-cPac)
-	p.mutex.Unlock()
+	// p.mutex.Unlock()
+	logLocal.Info("Processed the sphinx packet at", (time.Now()).String())
+	handledPackets = handledPackets +1
+	logLocal.Info("Total packets handled = ", handledPackets)
 	return nil
 }
 
@@ -177,26 +188,32 @@ func (p *ProviderServer) relayPacket() error {
 	for {
 		delayBeforeContinute(config.RoundDuration, config.SyncTime)
 		p.mutex.Lock()
-		rand.Shuffle(len(p.aPac), func(i, j int) { p.aPac[i], p.aPac[j] = p.aPac[j], p.aPac[i] })
-		for _, pp := range p.aPac {
+		packets := make([]node.MixPacket, len(p.aPac))
+		copy(packets, p.aPac)
+		p.mutex.Unlock()
+		rand.Shuffle(len(packets), func(i, j int) { packets[i], packets[j] = packets[j], packets[i] })
+		for _, pp := range packets {
 			var err error
 			switch pp.Flag {
 			case "\xF1":
 				err = p.forwardPacket(pp.Data, pp.Adr.Address)
 				if err != nil {
-					p.mutex.Unlock()
+					// p.mutex.Unlock()
 					return err
 				}
+				relayedPackets = relayedPackets +1
+				logLocal.Info("Total number of packets relayed", relayedPackets)
 			case "\xF0":
 				err = p.storeMessage(pp.Data, pp.Adr.Id, "TMP_MESSAGE_ID")
 				if err != nil {
-					p.mutex.Unlock()
+					// p.mutex.Unlock()
 					return err
 				}
 			default:
 				logLocal.Info("Sphinx packet flag not recognised")
 			}
 		}
+		p.mutex.Lock()
 		p.aPac = p.aPac[0:0]
 		p.mutex.Unlock()
 	}
