@@ -35,6 +35,7 @@ import (
 
 var mixServer *MixServer
 var providerServer *ProviderServer
+var anotherServer *ProviderServer
 
 const (
 	testDatabase = "testDatabase.db"
@@ -53,6 +54,29 @@ func createTestProvider() (*ProviderServer, error) {
 	return &provider, nil
 }
 
+// func createTestProviderWithPort(serverPort string) (*ProviderServer, error) {
+// 	pub, priv, err := sphinx.GenerateKeyPair()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	n := node.NewMix(pub, priv)
+// 	provider := ProviderServer{host: "localhost", port: serverPort, Mix: n}
+// 	provider.config = config.MixConfig{Id: provider.id, Host: provider.host, Port: provider.port, PubKey: provider.GetPublicKey()}
+// 	provider.assignedClients = make(map[string]ClientRecord)
+// 	provider.aPac = make([]node.MixPacket, 0)
+
+// 	addr, err := helpers.ResolveTCPAddress(mix.host, mix.port)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	provider.listener, err = net.ListenTCP("tcp", addr)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return &provider, nil
+// }
+
 func createTestMixnode() (*MixServer, error) {
 	pub, priv, err := sphinx.GenerateKeyPair()
 	if err != nil {
@@ -62,15 +86,16 @@ func createTestMixnode() (*MixServer, error) {
 	mix := MixServer{host: "localhost", port: "9995", Mix: n}
 	mix.config = config.MixConfig{Id: mix.id, Host: mix.host, Port: mix.port, PubKey: mix.GetPublicKey()}
 	mix.aPac = make([]node.MixPacket, 0)
+
 	addr, err := helpers.ResolveTCPAddress(mix.host, mix.port)
 	if err != nil {
 		return nil, err
 	}
-
 	mix.listener, err = net.ListenTCP("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
+
 	return &mix, nil
 }
 
@@ -104,6 +129,12 @@ func TestMain(m *testing.M) {
 		fmt.Println(err)
 		panic(m)
 	}
+
+	// anotherServer, err = createTestProviderWithPort("9998")
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	panic(m)
+	// }
 
 	code := m.Run()
 	clean()
@@ -238,7 +269,7 @@ func TestProviderServer_HandlePullRequest_Fail(t *testing.T) {
 		t.Error(err)
 	}
 	err = providerServer.handlePullRequest(bTestPullRequest)
-	assert.EqualError(t, errors.New("authentication went wrong"), err.Error(), "HandlePullRequest should return an error if authentication failed")
+	assert.EqualError(t, errors.New("ProviderServer: authentication went wrong"), err.Error(), "HandlePullRequest should return an error if authentication failed")
 }
 
 func TestProviderServer_RegisterNewClient(t *testing.T) {
@@ -298,6 +329,51 @@ func TestProviderServer_ReceivedPacket(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestProviderServer_BatchProcessPacket(t *testing.T) {
+	// packets := make([]node.MixPacket, len(p.aPac)) 
+	// threads := runtime.GOMAXPROCS(0) -2
+	delayBeforeContinute(config.RoundDuration, config.SyncTime)
+	roundAtStart := config.GetRound()
+
+	sphinxPacket := createTestPacket(t)
+	bSphinxPacket, err := proto.Marshal(sphinxPacket)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	providerServer.aPac = make([]node.MixPacket, 0)
+	testSize := 1000
+
+	for i := 0; i<testSize; i++ {
+		err = providerServer.receivedPacket(bSphinxPacket)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	
+	roundAtEnd := config.GetRound()
+	assert.Equal(t, roundAtStart, roundAtEnd, "The computation took more than one round.")
+	assert.Equal(t, testSize, len(providerServer.aPac), "All the messages are not processed.")
+}
+
+// func createNewTestPacket() *sphinx.SphinxPacket {
+// 	path := config.E2EPath{IngressProvider: providerServer.config, Mixes: []config.MixConfig{}, EgressProvider: anotherServer.config}
+// 	sphinxPacket, err := sphinx.PackForwardMessage(elliptic.P224(), path, []float64{0.1, 0.2}, "Hello world")
+// 	if err != nil {
+// 		t.Fatal(err)
+// 		return nil
+// 	}
+// 	return &sphinxPacket
+// }
+
+// func BenchmarkBigLen(b *testing.B) {
+//     big := NewBig()
+//     b.ResetTimer()
+//     for i := 0; i < b.N; i++ {
+//         big.Len()
+//     }
+// }
 
 func TestProviderServer_HandleConnection(t *testing.T) {
 	serverConn, _ := net.Pipe()

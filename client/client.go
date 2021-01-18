@@ -43,6 +43,7 @@ var (
 	tokenFlag               = []byte{0xa9}
 	pullFlag                = []byte{0xff}
 	packetsSent				= 0
+	// isSender 				= true
 )
 
 type Client interface {
@@ -218,12 +219,18 @@ func (c *client) handleConnection(conn net.Conn) {
 	switch string(packet.Flag) {
 	case string(tokenFlag):
 		c.registerToken(packet.Data)
-		go func() {
-			err := c.controlOutQueue()
-			if err != nil {
-				logLocal.WithError(err).Panic("Error in the controller of the outgoing packets queue. Possible security threat.")
-			}
-		}()
+		if c.id == "0" {
+			go func() {
+				err := c.controlOutQueue()
+				if err != nil {
+					logLocal.WithError(err).Panic("Error in the controller of the outgoing packets queue. Possible security threat.")
+				}
+			}()
+		} else {
+			go func() {
+				c.controlMessagingFetching()
+			}()
+		}
 
 		// if loopCoverTrafficEnabled {
 		// 	c.turnOnLoopCoverTraffic()
@@ -233,9 +240,9 @@ func (c *client) handleConnection(conn net.Conn) {
 		// 	c.turnOnDropCoverTraffic()
 		// }
 
-		go func() {
-			c.controlMessagingFetching()
-		}()
+		// go func() {
+		// 	c.controlMessagingFetching()
+		// }()
 
 	case string(commFlag):
 		_, err := c.processPacket(packet.Data)
@@ -320,41 +327,73 @@ func (c *client) getMessagesFromProvider() error {
 // drop cover message is sent instead.
 func (c *client) controlOutQueue() error {
 	logLocal.Info("Queue controller started")
-	err := delayBeforeContinute(config.RoundDuration, config.SyncTime)
+
+	// Just to allow the registration thread to continue.
+	time.Sleep(1 * time.Millisecond)
+
+	// // "I hate this hack." -- Debo.
+	// dummyQueue := make([][]byte, 100)
+	// for i:=0; i<200; i++ {
+	// 	dummyPacket, err := c.createDropCoverMessage()
+	// 	if err != nil {
+	// 		logLocal.WithError(err).Error("Error during populating the dummy message queue", err)
+	// 	}
+	// 	dummyQueue[i] = dummyPacket
+	// 	logLocal.Info("dummyQueue is appended with message number ", i)
+	// } 
+
+	dummyPacket, err := c.createDropCoverMessage()
 	if err != nil {
+		logLocal.WithError(err).Error("Error during the construction of a dummy packet. ", err)
 		return err
 	}
 
-	for i := 0; i < 50; i++ {
-		select {
-		case realPacket := <-c.outQueue:
-			c.send(realPacket, c.Provider.Host, c.Provider.Port)
-			logLocal.Info("Real packet was sent at ", (time.Now()).String())
-			packetsSent = packetsSent +1
-			logLocal.Info("Packet sent = ", packetsSent)
-		default:
-			dummyPacket, err := c.createDropCoverMessage()
-			if err != nil {
-				return err
-			}
-			c.send(dummyPacket, c.Provider.Host, c.Provider.Port)
-			logLocal.Info("OutQueue empty. Dummy packet sent at ", (time.Now()).String())
-			packetsSent = packetsSent +1
-			logLocal.Info("Packet sent = ", packetsSent)
-
-			// dummyPacket2, err2 := c.createDropCoverMessage()
-			// if err2 != nil {
-			// 	return err2
-			// }
-			// c.send(dummyPacket2, c.Provider.Host, c.Provider.Port)
-			// logLocal.Info("OutQueue empty. Dummy packet sent at ", (time.Now()).String())
-			// packetsSent = packetsSent +1
-			// logLocal.Info("Packet sent = ", packetsSent)
+	for j := 0; j < 1; j++{
+		err := delayBeforeContinute(config.RoundDuration, config.SyncTime)
+		if err != nil {
+			return err
 		}
-		// err := delayBeforeContinute(config.ClientDuration, config.SyncTime)
-		// if err != nil {
-		// 	return err
-		// }
+
+		round := config.GetRound()
+		logLocal.Info("Running round number ", round)
+		
+		// "Again, I don't like this hack" -- Debo.
+		for i := 0; i < 100; i++ {
+			select {
+			case realPacket := <-c.outQueue:
+				c.send(realPacket, c.Provider.Host, c.Provider.Port)
+				logLocal.Info("Real packet was sent at ", (time.Now()).String())
+				packetsSent = packetsSent +1
+				logLocal.Info("Packet sent = ", packetsSent)
+			default:
+				// dummyPacket, err := c.createDropCoverMessage()
+				// if err != nil {
+				// 	return err
+				// }
+				go c.send(dummyPacket, c.Provider.Host, c.Provider.Port)
+				// c.send(dummyQueue[50*j+i], c.Provider.Host, c.Provider.Port)
+				logLocal.Info("OutQueue empty. Dummy packet sent at ", (time.Now()).String())
+				packetsSent = packetsSent +1
+				logLocal.Info("Packet sent = ", packetsSent)
+	
+				// dummyPacket2, err2 := c.createDropCoverMessage()
+				// if err2 != nil {
+				// 	return err2
+				// }
+				// c.send(dummyPacket2, c.Provider.Host, c.Provider.Port)
+				// logLocal.Info("OutQueue empty. Dummy packet sent at ", (time.Now()).String())
+				// packetsSent = packetsSent +1
+				// logLocal.Info("Packet sent = ", packetsSent)
+			}
+			// err := delayBeforeContinute(config.ClientDuration, config.SyncTime)
+			// if err != nil {
+			// 	return err
+			// }
+		}
+
+		roundEnd := config.GetRound()
+		logLocal.Info("When done sending messages, the round number is ", roundEnd)
+		logLocal.Info("Started at round number ", round)
 	}
 	return nil
 }
@@ -370,6 +409,23 @@ func (c *client) controlMessagingFetching() {
 			logLocal.Error("Error in ControlMessagingFetching - generating random exp. value failed")
 		}
 	}
+}
+
+// createDummyMessage packs a dummy message into a Sphinx packet.
+// The dummy message is a noise message.
+func (c *client) createDummyMessage() ([]byte, error) {
+	dummyLoad := "DummyPayloadMessage"
+
+	sphinxPacket, err := c.EncodeMessage(dummyLoad, c.getRecipient(c.Network.Clients))
+	if err != nil {
+		return nil, err
+	}
+
+	packetBytes, err := config.WrapWithFlag(commFlag, sphinxPacket)
+	if err != nil {
+		return nil, err
+	}
+	return packetBytes, nil
 }
 
 // CreateCoverMessage packs a dummy message into a Sphinx packet.
@@ -394,10 +450,24 @@ func (c *client) createDropCoverMessage() ([]byte, error) {
 
 // getRandomRecipient picks a random client from the list of all available clients (stored by the client).
 // getRandomRecipient returns the selected client public configuration and an error
+func (c *client) getRecipient(slice []config.ClientConfig) (config.ClientConfig) {
+	for _, recipient := range slice {
+		if recipient.GetId() != c.id {
+			return recipient
+		}
+	}
+	return slice[0]
+}
+
+// getRandomRecipient picks a random client from the list of all available clients (stored by the client).
+// getRandomRecipient returns the selected client public configuration and an error
 func (c *client) getRandomRecipient(slice []config.ClientConfig) (config.ClientConfig, error) {
 	randIdx, err := rand.Int(rand.Reader, big.NewInt(int64(len(slice))))
 	if err != nil {
 		return config.ClientConfig{}, err
+	}
+	for slice[randIdx.Int64()].GetId() == c.id {
+		randIdx, err = rand.Int(rand.Reader, big.NewInt(int64(len(slice))))
 	}
 	return slice[randIdx.Int64()], nil
 }
@@ -529,6 +599,14 @@ func NewClient(id, host, port string, pubKey []byte, prvKey []byte, pkiDir strin
 	if err != nil {
 		return nil, err
 	}
+
+	// if clientType == "recipient" {
+	// 	isSender = false
+	// 	logLocal.Info("This is a dedicated recipient, no messages will be sent from this client.")
+	// } else {
+	// 	logLocal.Info("This client is going to send a lot of messages.")
+	// }
+	// isSender = senderFlag
 
 	return &c, nil
 }

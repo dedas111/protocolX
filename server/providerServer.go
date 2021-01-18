@@ -41,6 +41,7 @@ var (
 	pullFlag   = []byte{0xff}
 	handledPackets = 0
 	relayedPackets = 0
+	messageDelivered = 0
 )
 
 type ProviderIt interface {
@@ -92,12 +93,12 @@ func (p *ProviderServer) run() {
 	finish := make(chan bool)
 
 	go func() {
-		logLocal.Infof("Listening on %s", p.host+":"+p.port)
+		logLocal.Infof("ProviderServer: Listening on %s", p.host+":"+p.port)
 		p.listenForIncomingConnections()
 	}()
 
 	go func() {
-		logLocal.Infof("Preparing for relaying")
+		logLocal.Infof("ProviderServer: Preparing for relaying")
 		p.relayPacket()
 	}()
 	
@@ -108,12 +109,13 @@ func (p *ProviderServer) run() {
 // unwrapping operation and checks whether the packet should be
 // forwarded or stored. If the processing was unsuccessful and error is returned.
 func (p *ProviderServer) receivedPacket(packet []byte) error {
-	logLocal.Info("Received new sphinx packet")
+	logLocal.Info("ProviderServer: Received new sphinx packet")
 
-	if GetRemainingRoundTime(config.RoundDuration, config.SyncTime) < int64(20 * time.Millisecond) {
-		logLocal.Info("Packet dropped, because received at", (time.Now()).String())
-		return nil
-	}
+	// if GetRemainingRoundTime(config.RoundDuration, config.SyncTime) < int64(20 * time.Millisecond) {
+	// 	logLocal.Info("Packet dropped, because received at", (time.Now()).String())
+	// 	logLocal.Info("Remaining time:", GetRemainingRoundTime(config.RoundDuration, config.SyncTime))
+	// 	return nil
+	// }
 
 	cPac := make(chan node.MixPacket)
 	errCh := make(chan error)
@@ -126,9 +128,10 @@ func (p *ProviderServer) receivedPacket(packet []byte) error {
 	// p.mutex.Lock()
 	p.aPac = append(p.aPac, <-cPac)
 	// p.mutex.Unlock()
-	logLocal.Info("Processed the sphinx packet at", (time.Now()).String())
+	logLocal.Info("ProviderServer: Processed the sphinx packet at round : ", config.GetRound() )
+	logLocal.Info("ProviderServer: Current clock time : ", (time.Now()).String())
 	handledPackets = handledPackets +1
-	logLocal.Info("Total packets handled = ", handledPackets)
+	logLocal.Info("ProviderServer: Total packets handled = ", handledPackets)
 	return nil
 }
 
@@ -142,7 +145,7 @@ func (p *ProviderServer) forwardPacket(sphinxPacket []byte, address string) erro
 	if err != nil {
 		return err
 	}
-	logLocal.Info("Forwarded sphinx packet")
+	logLocal.Info("ProviderServer: Forwarded sphinx packet")
 	return nil
 }
 
@@ -173,7 +176,8 @@ func (p *ProviderServer) listenForIncomingConnections() {
 		if err != nil {
 			logLocal.WithError(err).Error(err)
 		} else {
-			logLocal.Infof("Received new connection from %s", conn.RemoteAddr())
+			logLocal.Infof("ProviderServer: Received new connection from %s", conn.RemoteAddr())
+			logLocal.Info("ProviderServer: Current round number : ", config.GetRound())
 			errs := make(chan error, 1)
 			go p.handleConnection(conn, errs)
 			err = <-errs
@@ -187,8 +191,8 @@ func (p *ProviderServer) listenForIncomingConnections() {
 func (p *ProviderServer) relayPacket() error {
 	for {
 		delayBeforeContinute(config.RoundDuration, config.SyncTime)
-		p.mutex.Lock()
 		packets := make([]node.MixPacket, len(p.aPac))
+		p.mutex.Lock()
 		copy(packets, p.aPac)
 		p.mutex.Unlock()
 		rand.Shuffle(len(packets), func(i, j int) { packets[i], packets[j] = packets[j], packets[i] })
@@ -202,7 +206,8 @@ func (p *ProviderServer) relayPacket() error {
 					return err
 				}
 				relayedPackets = relayedPackets +1
-				logLocal.Info("Total number of packets relayed", relayedPackets)
+				logLocal.Info("ProviderServer: Total number of packets relayed", relayedPackets)
+				logLocal.Info("ProviderServer: Relayed the sphinx packet at round : ", config.GetRound() )
 			case "\xF0":
 				err = p.storeMessage(pp.Data, pp.Adr.Id, "TMP_MESSAGE_ID")
 				if err != nil {
@@ -210,7 +215,7 @@ func (p *ProviderServer) relayPacket() error {
 					return err
 				}
 			default:
-				logLocal.Info("Sphinx packet flag not recognised")
+				logLocal.Info("ProviderServer: Sphinx packet flag not recognised")
 			}
 		}
 		p.mutex.Lock()
@@ -255,7 +260,7 @@ func (p *ProviderServer) handleConnection(conn net.Conn, errs chan<- error) {
 		}
 	default:
 		logLocal.Info(packet.Flag)
-		logLocal.Info("Packet flag not recognised. Packet dropped")
+		logLocal.Info("ProviderServer: Packet flag not recognised. Packet dropped")
 		errs <- nil
 	}
 	errs <- nil
@@ -294,7 +299,7 @@ func (p *ProviderServer) registerNewClient(clientBytes []byte) ([]byte, string, 
 // it registers the client in the list of all registered clients and send
 // an authentication token back to the client.
 func (p *ProviderServer) handleAssignRequest(packet []byte) error {
-	logLocal.Info("Received assign request from the client")
+	logLocal.Info("ProviderServer: Received assign request from the client")
 
 	token, adr, err := p.registerNewClient(packet)
 	if err != nil {
@@ -323,7 +328,7 @@ func (p *ProviderServer) handlePullRequest(rqsBytes []byte) error {
 		return err
 	}
 
-	logLocal.Infof("Processing pull request: %s %s", request.ClientId, string(request.Token))
+	logLocal.Infof("ProviderServer: Processing pull request: %s %s", request.ClientId, string(request.Token))
 
 	if p.authenticateUser(request.ClientId, request.Token) == true {
 		signal, err := p.fetchMessages(request.ClientId)
@@ -332,15 +337,15 @@ func (p *ProviderServer) handlePullRequest(rqsBytes []byte) error {
 		}
 		switch signal {
 		case "NI":
-			logLocal.Info("Inbox does not exist. Sending signal to client.")
+			logLocal.Info("ProviderServer: Inbox does not exist. Sending signal to client.")
 		case "EI":
-			logLocal.Info("Inbox is empty. Sending info to the client.")
+			logLocal.Info("ProviderServer: Inbox is empty. Sending info to the client.")
 		case "SI":
-			logLocal.Info("All messages from the inbox succesfuly sent to the client.")
+			logLocal.Info("ProviderServer: All messages from the inbox succesfuly sent to the client.")
 		}
 	} else {
-		logLocal.Warning("Authentication went wrong")
-		return errors.New("authentication went wrong")
+		logLocal.Warning("ProviderServer: Authentication went wrong")
+		return errors.New("ProviderServer: authentication went wrong")
 	}
 	return nil
 }
@@ -353,7 +358,7 @@ func (p *ProviderServer) authenticateUser(clientId string, clientToken []byte) b
 	if bytes.Compare(p.assignedClients[clientId].token, clientToken) == 0 {
 		return true
 	}
-	logLocal.Warningf("Non matching token: %s, %s", p.assignedClients[clientId].token, clientToken)
+	logLocal.Warningf("ProviderServer: Non matching token: %s, %s", p.assignedClients[clientId].token, clientToken)
 	return false
 }
 
@@ -388,7 +393,9 @@ func (p *ProviderServer) fetchMessages(clientId string) (string, error) {
 		}
 
 		address := p.assignedClients[clientId].host + ":" + p.assignedClients[clientId].port
-		logLocal.Infof("Found stored message for address %s", address)
+		logLocal.Infof("ProviderServer: Found stored message for address %s", address)
+		messageDelivered += 1
+		logLocal.Info("ProviderServer: Total messages delivered to recipient: ", messageDelivered)
 		msgBytes, err := config.WrapWithFlag(commFlag, dat)
 		if err != nil {
 			return "", err
@@ -419,7 +426,7 @@ func (p *ProviderServer) storeMessage(message []byte, inboxId string, messageId 
 		return err
 	}
 
-	logLocal.Infof("Stored message for %s", inboxId)
+	logLocal.Infof("ProviderServer: Stored message for %s", inboxId)
 	return nil
 }
 

@@ -35,7 +35,7 @@ var logLocal = logging.PackageLogger()
 
 const (
 	desiredRateParameter	= 0.1
-	pathLength           	= 2
+	pathLength           	= 0  // Use 0 for testing purposes only.
 )
 
 type NetworkPKI struct {
@@ -102,6 +102,10 @@ func (c *CryptoClient) buildPath(recipient config.ClientConfig) (config.E2EPath,
 
 func (c *CryptoClient) getReferenceMixSequence(mixes []config.MixConfig, length int) ([]config.MixConfig, error) {
 	var seq []config.MixConfig
+	// Really dirty hack
+	if length == 0 {
+		return seq, nil
+	}
 	round := config.GetRound()
 	for i := 0; i < length; i++ {
 		seq = append(seq, mixes[config.GetReferenceCharacter(round) % int64(len(mixes))])

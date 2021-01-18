@@ -24,6 +24,7 @@ import (
 
 	"flag"
 	"fmt"
+	"runtime"
 
 	"github.com/dedas111/protocolX/helpers"
 
@@ -119,7 +120,8 @@ func main() {
 	id := flag.String("id", "", "Id of the entity we want to run")
 	host := flag.String("host", "", "The host on which the entity is running")
 	port := flag.String("port", "", "The port on which the entity is running")
-	providerId := flag.String("provider", "", "The port on which the entity is running")
+	providerId := flag.String("provider", "", "The provider for the client")
+	// clientType := flag.String("clientType", "", "If the client is a sender/recipient")
 	flag.Parse()
 
 	err := pkiPreSetting(PKI_DIR)
@@ -136,6 +138,9 @@ func main() {
 
 	switch *typ {
 	case "client":
+		threads := runtime.GOMAXPROCS(0) -2
+		logLocal.Info("main: case client:  the total number of threads used : ", threads)
+
 		db, err := pki.OpenDatabase(PKI_DIR, "sqlite3")
 
 		if err != nil {
@@ -157,6 +162,9 @@ func main() {
 			panic(err)
 		}
 
+		// logLocal.Info("main: case client:  clientType : ", *clientType)
+		// senderFlag := *isSender == "yes"
+
 		client, err := client.NewClient(*id, *host, *port, pubC, privC, PKI_DIR, providerInfo)
 		if err != nil {
 			panic(err)
@@ -168,6 +176,9 @@ func main() {
 		}
 
 	case "mix":
+		threads := runtime.GOMAXPROCS(0) -2
+		logLocal.Info("main: case mix:  the total number of threads used : ", threads)
+
 		pubM, privM, err := sphinx.GenerateKeyPair()
 		if err != nil {
 			panic(err)
@@ -183,6 +194,10 @@ func main() {
 			panic(err)
 		}
 	case "provider":
+
+		threads := runtime.GOMAXPROCS(0) -2
+		logLocal.Info("main: case provider: the total number of threads used : ", threads)
+
 		pubP, privP, err := sphinx.GenerateKeyPair()
 		if err != nil {
 			panic(err)

@@ -68,7 +68,7 @@ func (m *MixServer) GetConfig() config.MixConfig {
 }
 
 func (m *MixServer) receivedPacket(packet []byte) error {
-	logLocal.Info("Received new sphinx packet at", (time.Now()).String())
+	logLocal.Info("MixServer: Received new sphinx packet at", (time.Now()).String())
 
 	cPac := make(chan node.MixPacket)
 	errCh := make(chan error)
@@ -81,9 +81,9 @@ func (m *MixServer) receivedPacket(packet []byte) error {
 	m.mutex.Lock()
 	m.aPac = append(m.aPac, <-cPac)
 	m.mutex.Unlock()
-	logLocal.Info("Processed the sphinx packet at", (time.Now()).String())
+	logLocal.Info("MixServer: Processed the sphinx packet at", (time.Now()).String())
 	processedPackets = processedPackets +1
-	logLocal.Info("Total packets processed = ", processedPackets)
+	logLocal.Info("MixServer: Total packets processed = ", processedPackets)
 	return nil
 }
 
@@ -121,12 +121,12 @@ func (m *MixServer) run() {
 	finish := make(chan bool)
 
 	go func() {
-		logLocal.Infof("Listening on %s", m.host+":"+m.port)
+		logLocal.Infof("MixServer: Listening on %s", m.host+":"+m.port)
 		m.listenForIncomingConnections()
 	}()
 
 	go func() {
-		logLocal.Infof("Preparing for relaying")
+		logLocal.Infof("MixServer: Preparing for relaying")
 		m.relayPacket()
 	}()
 	
@@ -140,7 +140,7 @@ func (m *MixServer) listenForIncomingConnections() {
 		if err != nil {
 			logLocal.WithError(err).Error(err)
 		} else {
-			logLocal.Infof("Received connection from %s", conn.RemoteAddr())
+			logLocal.Infof("MixServer: Received connection from %s", conn.RemoteAddr())
 			errs := make(chan error, 1)
 			go m.handleConnection(conn, errs)
 			err = <-errs
@@ -154,17 +154,22 @@ func (m *MixServer) listenForIncomingConnections() {
 func (m *MixServer) relayPacket() {
 	for {
 		delayBeforeContinute(config.RoundDuration, config.SyncTime)
+		packets := make([]node.MixPacket, len(m.aPac))
 		m.mutex.Lock()
-		rand.Shuffle(len(m.aPac), func(i, j int) { m.aPac[i], m.aPac[j] = m.aPac[j], m.aPac[i] })
-		for _, p := range m.aPac {
+		copy(packets, m.aPac)
+		m.mutex.Unlock()
+		// m.mutex.Lock()
+		rand.Shuffle(len(packets), func(i, j int) { packets[i], packets[j] = packets[j], packets[i] })
+		for _, p := range packets {
 			if p.Flag == "\xF1" {
 				m.forwardPacket(p.Data, p.Adr.Address)
 				packetsRelayed = packetsRelayed +1
-				logLocal.Info("Total number of packets relayed", packetsRelayed)
+				logLocal.Info("MixServer: Total number of packets relayed", packetsRelayed)
 			} else {
-				logLocal.Info("Packet has non-forward flag. Packet dropped")
+				logLocal.Info("MixServer: Packet has non-forward flag. Packet dropped")
 			}
 		}
+		m.mutex.Lock()
 		m.aPac = m.aPac[0:0]
 		m.mutex.Unlock()
 	}
@@ -205,7 +210,7 @@ func (m *MixServer) handleConnection(conn net.Conn, errs chan<- error) {
 			errs <- err
 		}
 	default:
-		logLocal.Infof("Packet flag %s not recognised. Packet dropped", packet.Flag)
+		logLocal.Infof("MixServer: Packet flag %s not recognised. Packet dropped", packet.Flag)
 		errs <- nil
 	}
 	errs <- nil
