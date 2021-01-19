@@ -30,7 +30,7 @@ import (
 	"os"
 	
 	"sync"
-	"time"
+	// "time"
 	"math/rand"
 )
 
@@ -39,7 +39,7 @@ var (
 	commFlag   = []byte{0xc6}
 	tokenFlag  = []byte{0xa9}
 	pullFlag   = []byte{0xff}
-	handledPackets = 0
+	// handledPackets = 0
 	relayedPackets = 0
 	messageDelivered = 0
 )
@@ -109,7 +109,7 @@ func (p *ProviderServer) run() {
 // unwrapping operation and checks whether the packet should be
 // forwarded or stored. If the processing was unsuccessful and error is returned.
 func (p *ProviderServer) receivedPacket(packet []byte) error {
-	logLocal.Info("ProviderServer: Received new sphinx packet")
+	// logLocal.Info("ProviderServer: Received new sphinx packet")
 
 	// if GetRemainingRoundTime(config.RoundDuration, config.SyncTime) < int64(20 * time.Millisecond) {
 	// 	logLocal.Info("Packet dropped, because received at", (time.Now()).String())
@@ -128,10 +128,10 @@ func (p *ProviderServer) receivedPacket(packet []byte) error {
 	// p.mutex.Lock()
 	p.aPac = append(p.aPac, <-cPac)
 	// p.mutex.Unlock()
-	logLocal.Info("ProviderServer: Processed the sphinx packet at round : ", config.GetRound() )
-	logLocal.Info("ProviderServer: Current clock time : ", (time.Now()).String())
-	handledPackets = handledPackets +1
-	logLocal.Info("ProviderServer: Total packets handled = ", handledPackets)
+	// logLocal.Info("ProviderServer: Processed the sphinx packet at round : ", config.GetRound() )
+	// logLocal.Info("ProviderServer: Current clock time : ", (time.Now()).String())
+	// handledPackets = handledPackets +1
+	// logLocal.Info("ProviderServer: Total packets handled = ", handledPackets)
 	return nil
 }
 
@@ -145,7 +145,7 @@ func (p *ProviderServer) forwardPacket(sphinxPacket []byte, address string) erro
 	if err != nil {
 		return err
 	}
-	logLocal.Info("ProviderServer: Forwarded sphinx packet")
+	// logLocal.Info("ProviderServer: Forwarded sphinx packet")
 	return nil
 }
 
@@ -170,31 +170,43 @@ func (p *ProviderServer) send(packet []byte, address string) error {
 // If the connection could not be accepted an error
 // is logged into the log files, but the function is not stopped
 func (p *ProviderServer) listenForIncomingConnections() {
-	for {
+	var wg sync.WaitGroup
+	for i:=0; i<180; i++ {
+		wg.Add(1)
 		conn, err := p.listener.Accept()
 
 		if err != nil {
 			logLocal.WithError(err).Error(err)
-		} else {
-			logLocal.Infof("ProviderServer: Received new connection from %s", conn.RemoteAddr())
-			logLocal.Info("ProviderServer: Current round number : ", config.GetRound())
-			errs := make(chan error, 1)
-			go p.handleConnection(conn, errs)
-			err = <-errs
+			return
+		} 
+		go func() {
+			// logLocal.Infof("ProviderServer: Received new connection from %s", conn.RemoteAddr())
+			// logLocal.Info("ProviderServer: Current round number : ", config.GetRound())
+			defer wg.Done()
+			// errs := make(chan error, 1)
+			err = p.handleConnection(conn)
 			if err != nil {
 				logLocal.WithError(err).Error(err)
 			}
-		}
+		}()
 	}
+	wg.Wait()
+	logLocal.Info("ProviderServer: packets processing done at round : ", config.GetRound() )
+	// logLocal.Info("ProviderServer: Total packets processed : ", handledPackets )
 }
 
 func (p *ProviderServer) relayPacket() error {
 	for {
 		delayBeforeContinute(config.RoundDuration, config.SyncTime)
-		packets := make([]node.MixPacket, len(p.aPac))
 		p.mutex.Lock()
+		packets := make([]node.MixPacket, len(p.aPac))
 		copy(packets, p.aPac)
 		p.mutex.Unlock()
+		if len(packets) == 0 {
+			continue
+		}
+		logLocal.Info("ProviderServer: Total number of packets to relay", len(packets))
+		logLocal.Info("ProviderServer: The packets to be relayed at round : ", config.GetRound() )
 		rand.Shuffle(len(packets), func(i, j int) { packets[i], packets[j] = packets[j], packets[i] })
 		for _, pp := range packets {
 			var err error
@@ -206,8 +218,8 @@ func (p *ProviderServer) relayPacket() error {
 					return err
 				}
 				relayedPackets = relayedPackets +1
-				logLocal.Info("ProviderServer: Total number of packets relayed", relayedPackets)
-				logLocal.Info("ProviderServer: Relayed the sphinx packet at round : ", config.GetRound() )
+				// logLocal.Info("ProviderServer: Total number of packets relayed", relayedPackets)
+				// logLocal.Info("ProviderServer: Relayed the sphinx packet at round : ", config.GetRound() )
 			case "\xF0":
 				err = p.storeMessage(pp.Data, pp.Adr.Id, "TMP_MESSAGE_ID")
 				if err != nil {
@@ -226,44 +238,49 @@ func (p *ProviderServer) relayPacket() error {
 
 // HandleConnection handles the received packets; it checks the flag of the
 // packet and schedules a corresponding process function and returns an error.
-func (p *ProviderServer) handleConnection(conn net.Conn, errs chan<- error) {
+func (p *ProviderServer) handleConnection(conn net.Conn) error {
 
 	buff := make([]byte, 1024)
 	reqLen, err := conn.Read(buff)
 	defer conn.Close()
 
 	if err != nil {
-		errs <- err
+		logLocal.WithError(err).Error(err)
+		return err
 	}
 
 	var packet config.GeneralPacket
 	err = proto.Unmarshal(buff[:reqLen], &packet)
 	if err != nil {
-		errs <- err
+		logLocal.WithError(err).Error(err)
+		return err
 	}
 
 	switch string(packet.Flag) {
 	case string(assignFlag):
 		err = p.handleAssignRequest(packet.Data)
 		if err != nil {
-			errs <- err
+			logLocal.WithError(err).Error(err)
+			return err
 		}
 	case string(commFlag):
 		err = p.receivedPacket(packet.Data)
 		if err != nil {
-			errs <- err
+			logLocal.WithError(err).Error(err)
+			return err
 		}
 	case string(pullFlag):
 		err = p.handlePullRequest(packet.Data)
 		if err != nil {
-			errs <- err
+			logLocal.WithError(err).Error(err)
+			return err
 		}
 	default:
 		logLocal.Info(packet.Flag)
 		logLocal.Info("ProviderServer: Packet flag not recognised. Packet dropped")
-		errs <- nil
+		return nil
 	}
-	errs <- nil
+	return nil
 }
 
 // RegisterNewClient generates a fresh authentication token and saves it together with client's public configuration data

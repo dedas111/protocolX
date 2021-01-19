@@ -26,11 +26,15 @@ import (
 	"crypto/elliptic"
 	"errors"
 	"fmt"
+	"sync"
+    // "time"
 	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
 	"testing"
+	"runtime"
+	"strconv"
 )
 
 var mixServer *MixServer
@@ -308,9 +312,9 @@ func TestProviderServer_HandleAssignRequest(t *testing.T) {
 	}
 }
 
-func createTestPacket(t *testing.T) *sphinx.SphinxPacket {
+func createTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
 	path := config.E2EPath{IngressProvider: providerServer.config, Mixes: []config.MixConfig{mixServer.config}, EgressProvider: providerServer.config}
-	sphinxPacket, err := sphinx.PackForwardMessage(elliptic.P224(), path, []float64{0.1, 0.2, 0.3}, "Hello world")
+	sphinxPacket, err := sphinx.PackForwardMessage(elliptic.P224(), path, []float64{0.1, 0.2, 0.3}, payload)
 	if err != nil {
 		t.Fatal(err)
 		return nil
@@ -319,7 +323,7 @@ func createTestPacket(t *testing.T) *sphinx.SphinxPacket {
 }
 
 func TestProviderServer_ReceivedPacket(t *testing.T) {
-	sphinxPacket := createTestPacket(t)
+	sphinxPacket := createTestPacket(t, "hello world")
 	bSphinxPacket, err := proto.Marshal(sphinxPacket)
 	if err != nil {
 		t.Fatal(err)
@@ -333,28 +337,63 @@ func TestProviderServer_ReceivedPacket(t *testing.T) {
 func TestProviderServer_BatchProcessPacket(t *testing.T) {
 	// packets := make([]node.MixPacket, len(p.aPac)) 
 	// threads := runtime.GOMAXPROCS(0) -2
+
+	
+	threads := runtime.GOMAXPROCS(0) -1
+	fmt.Println("test: the total number of threads used : ", threads)
+	// logLocal.Info("main: case client:  the total number of threads used : ", threads)
+
+	providerServer.aPac = make([]node.MixPacket, 0)
+	testSize := 1800
+	fmt.Println("test:  batch size : ", testSize)
+
+	var waitgroup sync.WaitGroup
+
+	dummyQueue := make([][]byte, testSize)
+	for j:=0; j<testSize; j++ {
+		waitgroup.Add(1)
+		// position := j
+		go func(position int) {
+			defer waitgroup.Done()
+			payload := strconv.Itoa(97)
+			sphinxPacket := createTestPacket(t, payload)
+			bSphinxPacket, err := proto.Marshal(sphinxPacket)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// dummyQueue = append(dummyQueue, bSphinxPacket)
+			dummyQueue[position] = bSphinxPacket
+			// logLocal.Info("dummyQueue is appended with message number ", i)
+		} (j)
+	} 
+	waitgroup.Wait()
+
+	var wg sync.WaitGroup
+
 	delayBeforeContinute(config.RoundDuration, config.SyncTime)
 	roundAtStart := config.GetRound()
 
-	sphinxPacket := createTestPacket(t)
-	bSphinxPacket, err := proto.Marshal(sphinxPacket)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	providerServer.aPac = make([]node.MixPacket, 0)
-	testSize := 1000
-
 	for i := 0; i<testSize; i++ {
-		err = providerServer.receivedPacket(bSphinxPacket)
-		if err != nil {
-			t.Fatal(err)
-		}
+		wg.Add(1)
+		dummyPacket := dummyQueue[i]
+		go func() {
+			defer wg.Done()
+			err := providerServer.receivedPacket(dummyPacket)
+			if err != nil {
+				t.Fatal(err)
+			}
+		} ()
+		// err = providerServer.receivedPacket(bSphinxPacket)
+		// if err != nil {
+		// 	t.Fatal(err)
+		// }
 	}
+	wg.Wait()
 	
 	roundAtEnd := config.GetRound()
-	assert.Equal(t, roundAtStart, roundAtEnd, "The computation took more than one round.")
-	assert.Equal(t, testSize, len(providerServer.aPac), "All the messages are not processed.")
+	fmt.Println("test: total messages processed : ", len(providerServer.aPac))
+	assert.Equal(t, roundAtStart+1, roundAtEnd, "The computation took more than one round.")
+	// assert.Equal(t, testSize, len(providerServer.aPac), "All the messages are not processed.")
 }
 
 // func createNewTestPacket() *sphinx.SphinxPacket {
@@ -377,16 +416,14 @@ func TestProviderServer_BatchProcessPacket(t *testing.T) {
 
 func TestProviderServer_HandleConnection(t *testing.T) {
 	serverConn, _ := net.Pipe()
-	errs := make(chan error, 1)
+	// errs := make(chan error, 1)
 	// serverConn.Write([]byte("test"))
 	go func() {
-		providerServer.handleConnection(serverConn, errs)
-		err := <-errs
+		err := providerServer.handleConnection(serverConn)
 		if err != nil {
 			t.Fatal(err)
 		}
 		serverConn.Close()
 	}()
-	serverConn.Close()
-
+	// serverConn.Close()
 }

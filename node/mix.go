@@ -19,7 +19,11 @@ package node
 
 import (
 	"github.com/dedas111/protocolX/sphinx"
+	"github.com/dedas111/protocolX/logging"
+	// "time"
 )
+
+var logLocal = logging.PackageLogger()
 
 type Mix struct {
 	pubKey []byte
@@ -36,7 +40,9 @@ type MixPacket struct {
 // extraction of the meta information.
 func (m *Mix) ProcessPacket(packet []byte, c chan<- MixPacket, errCh chan<- error) {
 	
+	// logLocal.Info("Mix: Before processing the sphinx packet, time : ", (time.Now()).String())
 	nextHop, commands, newPacket, err := sphinx.ProcessSphinxPacket(packet, m.prvKey)
+	// logLocal.Info("Mix: After processing the sphinx packet, time : ", (time.Now()).String())
 	if err != nil {
 		errCh <- err
 		return

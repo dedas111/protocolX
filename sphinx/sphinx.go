@@ -296,17 +296,80 @@ func ProcessSphinxPacket(packetBytes []byte, privKey []byte) (Hop, Commands, []b
 		return Hop{}, Commands{}, nil, err
 	}
 
-	hop, commands, newHeader, err := ProcessSphinxHeader(*packet.Hdr, privKey)
-	if err != nil {
-		logLocal.WithError(err).Error("Error in ProcessSphinxPacket - ProcessSphinxHeader failed")
-		return Hop{}, Commands{}, nil, err
+	// hop, commands, newHeader, err := ProcessSphinxHeader(*packet.Hdr, privKey)
+	// if err != nil {
+	// 	logLocal.WithError(err).Error("Error in ProcessSphinxPacket - ProcessSphinxHeader failed")
+	// 	return Hop{}, Commands{}, nil, err
+	// }
+
+	// packet := *packet.Hdr
+
+	alpha := packet.Hdr.Alpha
+	beta := packet.Hdr.Beta
+	mac := packet.Hdr.Mac
+
+	curve := elliptic.P224()
+	alphaX, alphaY := elliptic.Unmarshal(curve, alpha)
+	sharedSecretX, sharedSecretY := curve.Params().ScalarMult(alphaX, alphaY, privKey)
+	sharedSecret := elliptic.Marshal(curve, sharedSecretX, sharedSecretY)
+
+	aes_s := KDF(sharedSecret)
+	sharedKey := KDF(aes_s)
+
+	recomputedMac := computeMac(sharedKey, beta)
+
+	if bytes.Compare(recomputedMac, mac) != 0 {
+		logLocal.WithError(err).Error("Error in ProcessSphinxPacket - packet processing error: MACs are not matching")
+		// return Hop{}, Commands{}, Header{}, errors.New("packet processing error: MACs are not matching")
 	}
 
-	newPayload, err := ProcessSphinxPayload(packet.Hdr.Alpha, packet.Pld, privKey)
+	blinder, err := computeBlindingFactor(curve, aes_s)
 	if err != nil {
-		logLocal.WithError(err).Error("Error in ProcessSphinxPacket - ProcessSphinxPayload failed")
-		return Hop{}, Commands{}, nil, err
+		logLocal.WithError(err).Error("Error in ProcessSphinxHeader - computeBlindingFactor failed")
+		// return Hop{}, Commands{}, Header{}, err
 	}
+
+	newAlphaX, newAlphaY := curve.Params().ScalarMult(alphaX, alphaY, blinder.Bytes())
+	newAlpha := elliptic.Marshal(curve, newAlphaX, newAlphaY)
+
+	decBeta, err := AES_CTR(sharedKey, beta)
+	if err != nil {
+		logLocal.WithError(err).Error("Error in ProcessSphinxHeader - AES_CTR failed")
+		// return Hop{}, Commands{}, Header{}, err
+	}
+
+	var routingInfo RoutingInfo
+	err = proto.Unmarshal(decBeta, &routingInfo)
+	if err != nil {
+		logLocal.WithError(err).Error("Error in ProcessSphinxHeader - unmarshal of beta failed")
+		// return Hop{}, Commands{}, Header{}, err
+	}
+	hop, commands, nextBeta, nextMac := readBeta(routingInfo)
+	newHeader := Header{Alpha: newAlpha, Beta: nextBeta, Mac: nextMac}
+
+	// return nextHop, commands, Header{Alpha: newAlpha, Beta: nextBeta, Mac: nextMac}, nil
+
+	// curve := elliptic.P224()
+	// alphaX, alphaY := elliptic.Unmarshal(curve, alpha)
+	// sharedSecretX, sharedSecretY := curve.Params().ScalarMult(alphaX, alphaY, privKey)
+	// sharedSecret := elliptic.Marshal(curve, sharedSecretX, sharedSecretY)
+
+	// aes_s := KDF(sharedSecret)
+	// decKey := KDF(aes_s)
+
+	newPayload, err := AES_CTR(sharedKey, packet.Pld)
+	if err != nil {
+		logLocal.WithError(err).Error("Error in ProcessSphinxPayload - AES_CTR decryption failed")
+		// return nil, err
+	}
+
+	// return decPayload, nil
+
+	// newPayload, err := ProcessSphinxPayload(packet.Hdr.Alpha, packet.Pld, privKey)
+	// if err != nil {
+	// 	logLocal.WithError(err).Error("Error in ProcessSphinxPacket - ProcessSphinxPayload failed")
+	// 	return Hop{}, Commands{}, nil, err
+	// }
 
 	newPacket := SphinxPacket{Hdr: &newHeader, Pld: newPayload}
 	newPacketBytes, err := proto.Marshal(&newPacket)

@@ -31,6 +31,7 @@ import (
 	"math/big"
 	"net"
 	
+	// "sync"
 	"time"
 )
 
@@ -331,22 +332,24 @@ func (c *client) controlOutQueue() error {
 	// Just to allow the registration thread to continue.
 	time.Sleep(1 * time.Millisecond)
 
-	// // "I hate this hack." -- Debo.
-	// dummyQueue := make([][]byte, 100)
-	// for i:=0; i<200; i++ {
-	// 	dummyPacket, err := c.createDropCoverMessage()
-	// 	if err != nil {
-	// 		logLocal.WithError(err).Error("Error during populating the dummy message queue", err)
-	// 	}
-	// 	dummyQueue[i] = dummyPacket
-	// 	logLocal.Info("dummyQueue is appended with message number ", i)
-	// } 
+	// "I hate this hack." -- Debo.
+	dummyQueue := make([][]byte, 200)
+	for i:=0; i<200; i++ {
+		dummyPacket, err := c.createDropCoverMessage()
+		if err != nil {
+			logLocal.WithError(err).Error("Error during populating the dummy message queue", err)
+		}
+		dummyQueue[i] = dummyPacket
+		// logLocal.Info("dummyQueue is appended with message number ", i)
+	} 
 
-	dummyPacket, err := c.createDropCoverMessage()
-	if err != nil {
-		logLocal.WithError(err).Error("Error during the construction of a dummy packet. ", err)
-		return err
-	}
+	// dummyPacket, err := c.createDropCoverMessage()
+	// if err != nil {
+	// 	logLocal.WithError(err).Error("Error during the construction of a dummy packet. ", err)
+	// 	return err
+	// }
+
+	// var wg sync.WaitGroup
 
 	for j := 0; j < 1; j++{
 		err := delayBeforeContinute(config.RoundDuration, config.SyncTime)
@@ -355,10 +358,11 @@ func (c *client) controlOutQueue() error {
 		}
 
 		round := config.GetRound()
-		logLocal.Info("Running round number ", round)
+		logLocal.Info("Client: Running round number ", round)
+		logLocal.Info("Client: Current clock time : ", (time.Now()).String())
 		
 		// "Again, I don't like this hack" -- Debo.
-		for i := 0; i < 100; i++ {
+		for i := 0; i < 200; i++ {
 			select {
 			case realPacket := <-c.outQueue:
 				c.send(realPacket, c.Provider.Host, c.Provider.Port)
@@ -370,20 +374,25 @@ func (c *client) controlOutQueue() error {
 				// if err != nil {
 				// 	return err
 				// }
-				go c.send(dummyPacket, c.Provider.Host, c.Provider.Port)
+				// wg.Add(1)
+				// go func() {
+				// 	defer wg.Done()
+				// 	c.send(dummyPacket, c.Provider.Host, c.Provider.Port)
+				// 	// c.send(dummyQueue[50*j+i], c.Provider.Host, c.Provider.Port)
+				// 	logLocal.Info("OutQueue empty. Dummy packet sent at round ", config.GetRound())
+				// 	// packetsSent = packetsSent +1
+				// 	// logLocal.Info("Packet sent = ", packetsSent)
+				// } ()
+
+				dummyPacket := dummyQueue[i]
+				err = c.send(dummyPacket, c.Provider.Host, c.Provider.Port)
 				// c.send(dummyQueue[50*j+i], c.Provider.Host, c.Provider.Port)
-				logLocal.Info("OutQueue empty. Dummy packet sent at ", (time.Now()).String())
-				packetsSent = packetsSent +1
-				logLocal.Info("Packet sent = ", packetsSent)
-	
-				// dummyPacket2, err2 := c.createDropCoverMessage()
-				// if err2 != nil {
-				// 	return err2
-				// }
-				// c.send(dummyPacket2, c.Provider.Host, c.Provider.Port)
-				// logLocal.Info("OutQueue empty. Dummy packet sent at ", (time.Now()).String())
-				// packetsSent = packetsSent +1
-				// logLocal.Info("Packet sent = ", packetsSent)
+				if err != nil {
+					logLocal.Info("OutQueue empty. There was an error sending dummy packet: ", err)
+				} else {
+					logLocal.Info("OutQueue empty. Dummy packet sent at round ", config.GetRound())
+				}
+				// logLocal.Info("OutQueue empty. Dummy packet sent at round ", config.GetRound())
 			}
 			// err := delayBeforeContinute(config.ClientDuration, config.SyncTime)
 			// if err != nil {
@@ -391,9 +400,11 @@ func (c *client) controlOutQueue() error {
 			// }
 		}
 
+		// wg.Wait()
 		roundEnd := config.GetRound()
-		logLocal.Info("When done sending messages, the round number is ", roundEnd)
-		logLocal.Info("Started at round number ", round)
+		logLocal.Info("Client: When done sending messages, the round number is ", roundEnd)
+		logLocal.Info("Client: Started at round number ", round)
+		logLocal.Info("Client: Current clock time : ", (time.Now()).String())
 	}
 	return nil
 }
