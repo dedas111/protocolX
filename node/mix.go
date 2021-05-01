@@ -53,6 +53,21 @@ func (m *Mix) ProcessPacket(packet []byte, c chan<- MixPacket, errCh chan<- erro
 
 }
 
+func (m *Mix)ProcessPacketInSameThread(packet []byte) (*MixPacket, error){
+	
+	// logLocal.Info("Mix: Before processing the sphinx packet, time : ", (time.Now()).String())
+	nextHop, commands, newPacket, err := sphinx.ProcessSphinxPacket(packet, m.prvKey)
+	// logLocal.Info("Mix: After processing the sphinx packet, time : ", (time.Now()).String())
+	if err != nil {
+		// errCh <- err
+		return nil, err
+	}
+	
+	mixPacket := MixPacket{newPacket, nextHop, string(commands.Flag)}
+	return &mixPacket, nil
+
+}
+
 // GetPublicKey returns the public key of the mixnode.
 func (m *Mix) GetPublicKey() []byte {
 	return m.pubKey

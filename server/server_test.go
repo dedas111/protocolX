@@ -337,63 +337,110 @@ func TestProviderServer_ReceivedPacket(t *testing.T) {
 func TestProviderServer_BatchProcessPacket(t *testing.T) {
 	// packets := make([]node.MixPacket, len(p.aPac)) 
 	// threads := runtime.GOMAXPROCS(0) -2
-
 	
 	threads := runtime.GOMAXPROCS(0) -1
 	fmt.Println("test: the total number of threads used : ", threads)
 	// logLocal.Info("main: case client:  the total number of threads used : ", threads)
 
-	providerServer.aPac = make([]node.MixPacket, 0)
-	testSize := 1800
-	fmt.Println("test:  batch size : ", testSize)
-
-	var waitgroup sync.WaitGroup
-
-	dummyQueue := make([][]byte, testSize)
-	for j:=0; j<testSize; j++ {
-		waitgroup.Add(1)
-		// position := j
-		go func(position int) {
-			defer waitgroup.Done()
-			payload := strconv.Itoa(97)
-			sphinxPacket := createTestPacket(t, payload)
-			bSphinxPacket, err := proto.Marshal(sphinxPacket)
-			if err != nil {
-				t.Fatal(err)
-			}
-			// dummyQueue = append(dummyQueue, bSphinxPacket)
-			dummyQueue[position] = bSphinxPacket
-			// logLocal.Info("dummyQueue is appended with message number ", i)
-		} (j)
-	} 
-	waitgroup.Wait()
-
-	var wg sync.WaitGroup
-
-	delayBeforeContinute(config.RoundDuration, config.SyncTime)
-	roundAtStart := config.GetRound()
-
-	for i := 0; i<testSize; i++ {
-		wg.Add(1)
-		dummyPacket := dummyQueue[i]
-		go func() {
-			defer wg.Done()
-			err := providerServer.receivedPacket(dummyPacket)
-			if err != nil {
-				t.Fatal(err)
-			}
-		} ()
-		// err = providerServer.receivedPacket(bSphinxPacket)
-		// if err != nil {
-		// 	t.Fatal(err)
-		// }
-	}
-	wg.Wait()
+	// roundLengths := []time.Duration{500 * time.Millisecond}
+	// roundLengths := []time.Duration{100 * time.Millisecond, 200 * time.Millisecond, 500 * time.Millisecond, 1000 * time.Millisecond}
 	
-	roundAtEnd := config.GetRound()
-	fmt.Println("test: total messages processed : ", len(providerServer.aPac))
-	assert.Equal(t, roundAtStart+1, roundAtEnd, "The computation took more than one round.")
-	// assert.Equal(t, testSize, len(providerServer.aPac), "All the messages are not processed.")
+	// for _, roundDuration := range roundLengths {
+	fmt.Println("---------------------------------------- \n ")
+	fmt.Println("test:  ROUND DURATION : ", config.RoundDuration)
+	fmt.Println("---------------------------------------- \n ")
+	testSizes := []int{10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340, 360, 380, 400, 420, 440, 460, 480, 500, 520, 540, 560, 580, 600}
+	// testSizes := []int{2}
+	for _, testSize := range testSizes {	
+		// testSize := 2
+		fmt.Println("test:  batch size : ", testSize)
+		// providerServer.aPac = make([]node.MixPacket, 0)
+		providerServer.aPac = make([]node.MixPacket, testSize, testSize)
+	
+		var waitgroup sync.WaitGroup
+	
+		dummyQueue := make(chan []byte, testSize)
+		for j:=0; j<testSize; j++ {
+			waitgroup.Add(1)
+			// position := j
+			go func() {
+				defer waitgroup.Done()
+				payload := strconv.Itoa(97)
+				sphinxPacket := createTestPacket(t, payload)
+				bSphinxPacket, err := proto.Marshal(sphinxPacket)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// dummyQueue = append(dummyQueue, bSphinxPacket)
+				dummyQueue <- bSphinxPacket
+				// logLocal.Info("dummyQueue is appended with message number ", i)
+			} ()
+		} 
+		waitgroup.Wait()
+	
+		var wg sync.WaitGroup
+		lengthAtStart := len(dummyQueue)
+		wg.Add(testSize)
+		delayBeforeContinute(config.RoundDuration, config.SyncTime)
+		roundAtStart := config.GetRound()
+		// fmt.Println("test: total messages processed : ", len(providerServer.aPac))
+	
+		for i := 0; i<testSize; i++ {
+			index := i
+			go func() {
+				defer wg.Done()
+				// dummyPacket <- dummyQueue
+				// if dummyPacket == nil {
+				// 	t.Fatalf("Something wrong brother, why is the channel empty!")
+				// }
+				err := providerServer.receivedPacketWithIndex(<- dummyQueue, index)
+				if err != nil {
+					t.Fatal(err)
+				}
+			} ()
+			// err = providerServer.receivedPacket(bSphinxPacket)
+			// if err != nil {
+			// 	t.Fatal(err)
+			// }
+		}
+	
+		delayBeforeContinute(config.RoundDuration, config.SyncTime)
+		lengthOfChannel := len(dummyQueue)
+		packets := make([]node.MixPacket, len(providerServer.aPac))
+		providerServer.mutex.Lock()
+		copy(packets, providerServer.aPac)
+		providerServer.mutex.Unlock()
+		// lengthAtEnd := countMixPackets(packets)
+	
+		wg.Wait()
+		roundAtEnd := config.GetRound()
+		fmt.Println("test: total messages processed after one round : ", countMixPackets(packets))
+		fmt.Println("test: remaining packets in the channel after one round : ", lengthOfChannel)
+
+		fmt.Println("test: total messages initially sent : ", lengthAtStart)
+		fmt.Println("test: total messages processed after all the threads are done : ", countMixPackets(providerServer.aPac))
+		fmt.Println("test: The run started at round : ", roundAtStart)
+		fmt.Println("test: The run ended at round : ", roundAtEnd)
+		// if (roundAtEnd > roundAtStart+1) {
+		// 	assert.Equal(t, roundAtStart+1, roundAtEnd, "The computation took more than one round.")
+		// 	break
+		// }
+		// assert.Equal(t, roundAtStart+1, roundAtEnd, "The computation took more than one round.")
+		// assert.Equal(t, testSize, len(providerServer.aPac), "All the messages are not processed.")
+	}
+	// }
+}
+
+func countMixPackets(packets []node.MixPacket) int {
+	count := 0
+	for i := 0; i < len(packets); i++ {
+		if packets[i].Flag == "" {
+			// fmt.Println("is zero value")
+			continue
+		}
+		count++
+	}
+	return count
 }
 
 // func createNewTestPacket() *sphinx.SphinxPacket {

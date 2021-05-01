@@ -63,7 +63,7 @@ var SyncTime = time.Unix(0, 0)
 
 const (
 	PathLength           	= 0
-	RoundDuration			= 1000 * time.Millisecond
+	RoundDuration			= 500 * time.Millisecond
 	ClientDuration			= 1 * time.Millisecond
 )
 

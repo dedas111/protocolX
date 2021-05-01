@@ -199,11 +199,11 @@ func (p *ProviderServer) send(packet []byte, address string) error {
 }
 
 // Function responsible for running the listening process of the server;
-// The providers listener accepts incoming connections and
+// The servers listener accepts incoming connections and
 // passes the incoming packets to the packet handler.
 // If the connection could not be accepted an error
 // is logged into the log files, but the function is not stopped
-func (p *ProviderServer) listenForIncomingConnections() {
+func (p *Server) listenForIncomingConnections() {
 	var wg sync.WaitGroup
 	for i:=0; i<180; i++ {
 		wg.Add(1)
@@ -214,8 +214,8 @@ func (p *ProviderServer) listenForIncomingConnections() {
 			return
 		} 
 		go func() {
-			// logLocal.Infof("ProviderServer: Received new connection from %s", conn.RemoteAddr())
-			// logLocal.Info("ProviderServer: Current round number : ", config.GetRound())
+			// logLocal.Infof("Server: Received new connection from %s", conn.RemoteAddr())
+			// logLocal.Info("Server: Current round number : ", config.GetRound())
 			defer wg.Done()
 			// errs := make(chan error, 1)
 			err = p.handleConnection(conn)
@@ -225,54 +225,37 @@ func (p *ProviderServer) listenForIncomingConnections() {
 		}()
 	}
 	wg.Wait()
-	logLocal.Info("ProviderServer: packets processing done at round : ", config.GetRound() )
-	// logLocal.Info("ProviderServer: Total packets processed : ", handledPackets )
+	logLocal.Info("Server: packets processing done at round : ", config.GetRound() )
+	// logLocal.Info("Server: Total packets processed : ", handledPackets )
 }
 
-func (p *ProviderServer) relayPacket() error {
+func (p *Server) relayPacket() error {
 	for {
 		delayBeforeContinute(config.RoundDuration, config.SyncTime)
-		p.mutex.Lock()
-		packets := make([]node.MixPacket, len(p.aPac))
-		copy(packets, p.aPac)
-		p.mutex.Unlock()
-		if len(packets) == 0 {
-			continue
-		}
-		logLocal.Info("ProviderServer: Total number of packets to relay", len(packets))
-		logLocal.Info("ProviderServer: The packets to be relayed at round : ", config.GetRound() )
+		packets := make([]node.MixPacket, len(m.aPac))
+		m.mutex.Lock()
+		copy(packets, m.aPac)
+		m.mutex.Unlock()
+		// m.mutex.Lock()
 		rand.Shuffle(len(packets), func(i, j int) { packets[i], packets[j] = packets[j], packets[i] })
-		for _, pp := range packets {
-			var err error
-			switch pp.Flag {
-			case "\xF1":
-				err = p.forwardPacket(pp.Data, pp.Adr.Address)
-				if err != nil {
-					// p.mutex.Unlock()
-					return err
-				}
-				relayedPackets = relayedPackets +1
-				// logLocal.Info("ProviderServer: Total number of packets relayed", relayedPackets)
-				// logLocal.Info("ProviderServer: Relayed the sphinx packet at round : ", config.GetRound() )
-			case "\xF0":
-				err = p.storeMessage(pp.Data, pp.Adr.Id, "TMP_MESSAGE_ID")
-				if err != nil {
-					// p.mutex.Unlock()
-					return err
-				}
-			default:
-				logLocal.Info("ProviderServer: Sphinx packet flag not recognised")
+		for _, p := range packets {
+			if p.Flag == "\xF1" {
+				m.forwardPacket(p.Data, p.Adr.Address)
+				packetsRelayed = packetsRelayed +1
+				logLocal.Info("MixServer: Total number of packets relayed", packetsRelayed)
+			} else {
+				logLocal.Info("MixServer: Packet has non-forward flag. Packet dropped")
 			}
 		}
-		p.mutex.Lock()
-		p.aPac = p.aPac[0:0]
-		p.mutex.Unlock()
+		m.mutex.Lock()
+		m.aPac = m.aPac[0:0]
+		m.mutex.Unlock()
 	}
 }
 
 // HandleConnection handles the received packets; it checks the flag of the
 // packet and schedules a corresponding process function and returns an error.
-func (p *ProviderServer) handleConnection(conn net.Conn) error {
+func (p *Server) handleConnection(conn net.Conn) error {
 
 	buff := make([]byte, 1024)
 	reqLen, err := conn.Read(buff)
@@ -311,7 +294,7 @@ func (p *ProviderServer) handleConnection(conn net.Conn) error {
 		}
 	default:
 		logLocal.Info(packet.Flag)
-		logLocal.Info("ProviderServer: Packet flag not recognised. Packet dropped")
+		logLocal.Info("Server: Packet flag not recognised. Packet dropped")
 		return nil
 	}
 	return nil
@@ -320,7 +303,7 @@ func (p *ProviderServer) handleConnection(conn net.Conn) error {
 // RegisterNewClient generates a fresh authentication token and saves it together with client's public configuration data
 // in the list of all registered clients. After the client is registered the function creates an inbox directory
 // for the client's inbox, in which clients messages will be stored.
-func (p *ProviderServer) registerNewClient(clientBytes []byte) ([]byte, string, error) {
+func (p *Server) registerNewClient(clientBytes []byte) ([]byte, string, error) {
 	var clientConf config.ClientConfig
 	err := proto.Unmarshal(clientBytes, &clientConf)
 	if err != nil {
@@ -349,8 +332,8 @@ func (p *ProviderServer) registerNewClient(clientBytes []byte) ([]byte, string, 
 // Function is responsible for handling the registration request from the client.
 // it registers the client in the list of all registered clients and send
 // an authentication token back to the client.
-func (p *ProviderServer) handleAssignRequest(packet []byte) error {
-	logLocal.Info("ProviderServer: Received assign request from the client")
+func (p *Server) handleAssignRequest(packet []byte) error {
+	logLocal.Info("Server: Received assign request from the client")
 
 	token, adr, err := p.registerNewClient(packet)
 	if err != nil {
@@ -368,43 +351,11 @@ func (p *ProviderServer) handleAssignRequest(packet []byte) error {
 	return nil
 }
 
-// Function is responsible for handling the pull request received from the client.
-// It first authenticates the client, by checking if the received token is valid.
-// If yes, the function triggers the function for checking client's inbox
-// and sending buffered messages. Otherwise, an error is returned.
-func (p *ProviderServer) handlePullRequest(rqsBytes []byte) error {
-	var request config.PullRequest
-	err := proto.Unmarshal(rqsBytes, &request)
-	if err != nil {
-		return err
-	}
-
-	logLocal.Infof("ProviderServer: Processing pull request: %s %s", request.ClientId, string(request.Token))
-
-	if p.authenticateUser(request.ClientId, request.Token) == true {
-		signal, err := p.fetchMessages(request.ClientId)
-		if err != nil {
-			return err
-		}
-		switch signal {
-		case "NI":
-			logLocal.Info("ProviderServer: Inbox does not exist. Sending signal to client.")
-		case "EI":
-			logLocal.Info("ProviderServer: Inbox is empty. Sending info to the client.")
-		case "SI":
-			logLocal.Info("ProviderServer: All messages from the inbox succesfuly sent to the client.")
-		}
-	} else {
-		logLocal.Warning("ProviderServer: Authentication went wrong")
-		return errors.New("ProviderServer: authentication went wrong")
-	}
-	return nil
-}
 
 // AuthenticateUser compares the authentication token received from the client with
 // the one stored by the provider. If tokens are the same, it returns true
 // and false otherwise.
-func (p *ProviderServer) authenticateUser(clientId string, clientToken []byte) bool {
+func (p *Server) authenticateUser(clientId string, clientToken []byte) bool {
 
 	if bytes.Compare(p.assignedClients[clientId].token, clientToken) == 0 {
 		return true
@@ -413,100 +364,32 @@ func (p *ProviderServer) authenticateUser(clientId string, clientToken []byte) b
 	return false
 }
 
-// FetchMessages fetches messages from the requested inbox.
-// FetchMessages checks whether an inbox exists and if it contains
-// stored messages. If inbox contains any stored messages, all of them
-// are send to the client one by one. FetchMessages returns a code
-// signaling whether (NI) inbox does not exist, (EI) inbox is empty,
-// (SI) messages were send to the client; and an error.
-func (p *ProviderServer) fetchMessages(clientId string) (string, error) {
-
-	path := fmt.Sprintf("./inboxes/%s", clientId)
-	exist, err := helpers.DirExists(path)
-	if err != nil {
-		return "", err
-	}
-	if exist == false {
-		return "NI", nil
-	}
-	files, err := ioutil.ReadDir(path)
-	if err != nil {
-		return "", err
-	}
-	if len(files) == 0 {
-		return "EI", nil
-	}
-
-	for _, f := range files {
-		dat, err := ioutil.ReadFile(path + "/" + f.Name())
-		if err != nil {
-			return "", err
-		}
-
-		address := p.assignedClients[clientId].host + ":" + p.assignedClients[clientId].port
-		logLocal.Infof("ProviderServer: Found stored message for address %s", address)
-		messageDelivered += 1
-		logLocal.Info("ProviderServer: Total messages delivered to recipient: ", messageDelivered)
-		msgBytes, err := config.WrapWithFlag(commFlag, dat)
-		if err != nil {
-			return "", err
-		}
-		err = p.send(msgBytes, address)
-		if err != nil {
-			return "", err
-		}
-	}
-	return "SI", nil
-}
-
-// StoreMessage saves the given message in the inbox defined by the given id.
-// If the inbox address does not exist or writing into the inbox was unsuccessful
-// the function returns an error
-func (p *ProviderServer) storeMessage(message []byte, inboxId string, messageId string) error {
-	path := fmt.Sprintf("./inboxes/%s", inboxId)
-	fileName := path + "/" + messageId + ".txt"
-
-	file, err := os.Create(fileName)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = file.Write(message)
-	if err != nil {
-		return err
-	}
-
-	logLocal.Infof("ProviderServer: Stored message for %s", inboxId)
-	return nil
-}
-
-// NewProviderServer constructs a new provider object.
-// NewProviderServer returns a new provider object and an error.
-func NewProviderServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string) (*ProviderServer, error) {
+// NewServer constructs a new server object.
+// NewServer returns a new server object and an error.
+func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string) (*Server, error) {
 	node := node.NewMix(pubKey, prvKey)
-	providerServer := ProviderServer{id: id, host: host, port: port, Mix: node, listener: nil}
-	providerServer.config = config.MixConfig{Id: providerServer.id, Host: providerServer.host, Port: providerServer.port, PubKey: providerServer.GetPublicKey()}
-	providerServer.assignedClients = make(map[string]ClientRecord)
+	server := Server{id: id, host: host, port: port, Mix: node, listener: nil}
+	server.config = config.MixConfig{Id: server.id, Host: server.host, Port: server.port, PubKey: server.GetPublicKey()}
+	server.assignedClients = make(map[string]ClientRecord)
 
-	configBytes, err := proto.Marshal(&providerServer.config)
+	configBytes, err := proto.Marshal(&server.config)
 	if err != nil {
 		return nil, err
 	}
-	err = helpers.AddToDatabase(pkiPath, "Pki", providerServer.id, "Provider", configBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	addr, err := helpers.ResolveTCPAddress(providerServer.host, providerServer.port)
-	if err != nil {
-		return nil, err
-	}
-	providerServer.listener, err = net.ListenTCP("tcp", addr)
-
+	err = helpers.AddToDatabase(pkiPath, "Pki", server.id, "Provider", configBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	return &providerServer, nil
+	addr, err := helpers.ResolveTCPAddress(server.host, server.port)
+	if err != nil {
+		return nil, err
+	}
+	server.listener, err = net.ListenTCP("tcp", addr)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &server, nil
 }

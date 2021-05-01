@@ -37,12 +37,12 @@ var logLocal = logging.PackageLogger()
 var processedPackets = 0
 var packetsRelayed = 0
 
-type MixServerIt interface {
-	networker.NetworkServer
-	networker.NetworkClient
-	GetConfig() config.MixConfig
-	Start() error
-}
+// type MixServerIt interface {
+// 	networker.NetworkServer
+// 	networker.NetworkClient
+// 	GetConfig() config.MixConfig
+// 	Start() error
+// }
 
 type MixServer struct {
 	id       string
