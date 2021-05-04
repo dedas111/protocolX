@@ -23,16 +23,19 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"crypto/rand"
+    "crypto/tls"
+	"crypto/x509"
+
 	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
-	
 	"sync"
 	// "time"
-	"math/rand"
+	// "math/rand"
 )
 
 var (
@@ -45,14 +48,14 @@ var (
 	messageDelivered = 0
 )
 
-// type ProviderIt interface {
-// 	networker.NetworkServer
-// 	networker.NetworkClient
-// 	Start() error
-// 	GetConfig() config.MixConfig
-// }
+type ProviderIt interface {
+	networker.NetworkServer
+	networker.NetworkClient
+	Start() error
+	GetConfig() config.MixConfig
+}
 
-type ProviderServer struct {
+type Server struct {
 	id   string
 	host string
 	port string
@@ -77,29 +80,29 @@ type ClientRecord struct {
 // Start function creates the loggers for capturing the info and error logs
 // and starts the listening server. Function returns an error
 // signaling whether any operation was unsuccessful
-func (p *ProviderServer) Start() error {
+func (p *Server) Start() error {
 	p.aPac = make([]node.MixPacket, 0)
 	p.run()
 	return nil
 }
 
-func (p *ProviderServer) GetConfig() config.MixConfig {
+func (p *Server) GetConfig() config.MixConfig {
 	return p.config
 }
 
 // Function opens the listener to start listening on provider's host and port
-func (p *ProviderServer) run() {
+func (p *Server) run() {
 
 	defer p.listener.Close()
 	finish := make(chan bool)
 
 	go func() {
-		logLocal.Infof("ProviderServer: Listening on %s", p.host+":"+p.port)
+		logLocal.Infof("Server: Listening on %s", p.host+":"+p.port)
 		p.listenForIncomingConnections()
 	}()
 
 	go func() {
-		logLocal.Infof("ProviderServer: Preparing for relaying")
+		logLocal.Infof("Server: Preparing for relaying")
 		p.relayPacket()
 	}()
 	
@@ -109,7 +112,7 @@ func (p *ProviderServer) run() {
 // Function processes the received sphinx packet, performs the
 // unwrapping operation and checks whether the packet should be
 // forwarded or stored. If the processing was unsuccessful and error is returned.
-func (p *ProviderServer) receivedPacketWithIndex(packet []byte, index int) error {
+func (p *Server) receivedPacketWithIndex(packet []byte, index int) error {
 	newPacket, err := p.ProcessPacketInSameThread(packet)
 	if err != nil {
 		return err
@@ -132,8 +135,8 @@ func (p *ProviderServer) receivedPacketWithIndex(packet []byte, index int) error
 // Function processes the received sphinx packet, performs the
 // unwrapping operation and checks whether the packet should be
 // forwarded or stored. If the processing was unsuccessful and error is returned.
-func (p *ProviderServer) receivedPacket(packet []byte) error {
-	// logLocal.Info("ProviderServer: Received new sphinx packet")
+func (p *Server) receivedPacket(packet []byte) error {
+	// logLocal.Info("Server: Received new sphinx packet")
 
 	// if GetRemainingRoundTime(config.RoundDuration, config.SyncTime) < int64(20 * time.Millisecond) {
 	// 	logLocal.Info("Packet dropped, because received at", (time.Now()).String())
@@ -162,14 +165,14 @@ func (p *ProviderServer) receivedPacket(packet []byte) error {
 	// // p.mutex.Lock()
 	// p.aPac = append(p.aPac, <-cPac)
 	// // p.mutex.Unlock()
-	// // logLocal.Info("ProviderServer: Processed the sphinx packet at round : ", config.GetRound() )
-	// // logLocal.Info("ProviderServer: Current clock time : ", (time.Now()).String())
+	// // logLocal.Info("Server: Processed the sphinx packet at round : ", config.GetRound() )
+	// // logLocal.Info("Server: Current clock time : ", (time.Now()).String())
 	// // handledPackets = handledPackets +1
-	// // logLocal.Info("ProviderServer: Total packets handled = ", handledPackets)
+	// // logLocal.Info("Server: Total packets handled = ", handledPackets)
 	return nil
 }
 
-func (p *ProviderServer) forwardPacket(sphinxPacket []byte, address string) error {
+func (p *Server) forwardPacket(sphinxPacket []byte, address string) error {
 	packetBytes, err := config.WrapWithFlag(commFlag, sphinxPacket)
 	if err != nil {
 		return err
@@ -179,14 +182,14 @@ func (p *ProviderServer) forwardPacket(sphinxPacket []byte, address string) erro
 	if err != nil {
 		return err
 	}
-	// logLocal.Info("ProviderServer: Forwarded sphinx packet")
+	// logLocal.Info("Server: Forwarded sphinx packet")
 	return nil
 }
 
 // Function opens a connection with selected network address
 // and send the passed packet. If connection failed or
 // the packet could not be send, an error is returned
-func (p *ProviderServer) send(packet []byte, address string) error {
+func (p *Server) send(packet []byte, address string) error {
 
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
@@ -237,7 +240,7 @@ func (p *Server) relayPacket() error {
 		copy(packets, m.aPac)
 		m.mutex.Unlock()
 		// m.mutex.Lock()
-		rand.Shuffle(len(packets), func(i, j int) { packets[i], packets[j] = packets[j], packets[i] })
+		shuffle()
 		for _, p := range packets {
 			if p.Flag == "\xF1" {
 				m.forwardPacket(p.Data, p.Adr.Address)
@@ -251,6 +254,67 @@ func (p *Server) relayPacket() error {
 		m.aPac = m.aPac[0:0]
 		m.mutex.Unlock()
 	}
+}
+
+func (p *Server) startTlsServer() error {
+    cert, err := tls.LoadX509KeyPair("certs/server.pem", "certs/server.key")
+    if err != nil {
+        // log.Fatalf("server: loadkeys: %s", err)
+		logLocal.Info("server: loadkeys: %s", err)
+		return err
+    }
+    config := tls.Config{Certificates: []tls.Certificate{cert}}
+    config.Rand = rand.Reader
+    service := "0.0.0.0:8000"
+    listener, err := tls.Listen("tcp", service, &config)
+    if err != nil {
+        // log.Fatalf("server: listen: %s", err)
+		logLocal.Info("server: listen: %s", err)
+		return err
+    }
+    logLocal.Info("server: listening")
+    for {
+        conn, err := listener.Accept()
+        if err != nil {
+            logLocal.Info("server: accept: %s", err)
+            break
+        }
+        defer conn.Close()
+        logLocal.Info("server: accepted from %s", conn.RemoteAddr())
+        tlscon, ok := conn.(*tls.Conn)
+        if ok {
+            logLocal.Info("ok=true")
+            state := tlscon.ConnectionState()
+            for _, v := range state.PeerCertificates {
+                logLocal.Info(x509.MarshalPKIXPublicKey(v.PublicKey))
+            }
+        }
+        go handleClient(conn)
+    }
+}
+
+func handleClient(conn net.Conn) {
+    defer conn.Close()
+    buf := make([]byte, 512)
+    for {
+        logLocal.Info("server: conn: waiting")
+        n, err := conn.Read(buf)
+        if err != nil {
+        	log.Printf("server: conn: read: %s", err)
+            break
+        }
+        logLocal.Info("server: conn: echo %q\n", string(buf[:n]))
+        n, err = conn.Write(buf[:n])
+
+        n, err = conn.Write(buf[:n])
+        logLocal.Info("server: conn: wrote %d bytes", n)
+
+        if err != nil {
+            logLocal.Info("server: write: %s", err)
+            break
+        }
+    }
+    logLocal.Info("server: conn: closed")
 }
 
 // HandleConnection handles the received packets; it checks the flag of the

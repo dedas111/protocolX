@@ -23,8 +23,6 @@ import (
 	// "time"
 )
 
-var logLocal = logging.PackageLogger()
-
 type Mix struct {
 	pubKey []byte
 	prvKey []byte
@@ -35,6 +33,15 @@ type MixPacket struct {
 	Adr sphinx.Hop
 	Flag string
 }
+
+var (
+	randTable = []int
+	shuffled = []int
+	//packets = []MixPacket*
+	numPackets = int
+	logLocal = logging.PackageLogger()
+)
+// var logLocal = logging.PackageLogger()
 
 // ProcessPacket performs the processing operation on the received packet, including cryptographic operations and
 // extraction of the meta information.
@@ -73,7 +80,18 @@ func (m *Mix) GetPublicKey() []byte {
 	return m.pubKey
 }
 
+
+func () preprocessShuffle() {
+	lastRandIndex = 0
+	for i := numPackets; i >= 1; i-- {
+		j = randTable[lastRandIndex]
+		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+		lastRandIndex++
+	}
+}
+
 // NewMix creates a new instance of Mix struct with given public and private key
 func NewMix(pubKey []byte, prvKey []byte) *Mix {
 	return &Mix{pubKey: pubKey, prvKey: prvKey}
 }
+

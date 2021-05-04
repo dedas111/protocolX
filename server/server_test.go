@@ -39,7 +39,7 @@ import (
 
 var mixServer *MixServer
 var providerServer *ProviderServer
-var anotherServer *ProviderServer
+var anotherServer *Server
 
 const (
 	testDatabase = "testDatabase.db"
