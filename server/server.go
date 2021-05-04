@@ -30,6 +30,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"os"
@@ -293,7 +294,7 @@ func (p *Server) startTlsServer() error {
     }
 }
 
-func handleClient(conn net.Conn) {
+func (p *Server) handleClient(conn net.Conn) {
     defer conn.Close()
     buf := make([]byte, 512)
     for {
@@ -315,6 +316,40 @@ func handleClient(conn net.Conn) {
         }
     }
     logLocal.Info("server: conn: closed")
+}
+
+func (p *Server) createTlsConnection() {
+    cert, err := tls.LoadX509KeyPair("certs/client.pem", "certs/client.key")
+    if err != nil {
+        logLocal.Info("server: loadkeys: %s", err)
+    }
+    config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+    conn, err := tls.Dial("tcp", "127.0.0.1:8000", &config)
+    if err != nil {
+        logLocal.Info("client: dial: %s", err)
+    }
+    defer conn.Close()
+    logLocal.Info("client: connected to: ", conn.RemoteAddr())
+
+    state := conn.ConnectionState()
+    for _, v := range state.PeerCertificates {
+        fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
+        fmt.Println(v.Subject)
+    }
+    logLocal.Info("client: handshake: ", state.HandshakeComplete)
+    logLocal.Info("client: mutual: ", state.NegotiatedProtocolIsMutual)
+
+    message := "Hello\n"
+    n, err := io.WriteString(conn, message)
+    if err != nil {
+        logLocal.Info("client: write: %s", err)
+    }
+    logLocal.Info("client: wrote %q (%d bytes)", message, n)
+
+    reply := make([]byte, 256)
+    n, err = conn.Read(reply)
+    logLocal.Info("client: read %q (%d bytes)", string(reply[:n]), n)
+    logLocal.Info("client: exiting")
 }
 
 // HandleConnection handles the received packets; it checks the flag of the
