@@ -24,6 +24,9 @@ import (
 	"crypto/elliptic"
 	"os"
 	"reflect"
+	"fmt"
+	// "sync"
+    "time"
 	"testing"
 )
 
@@ -113,4 +116,21 @@ func TestMixProcessPacket(t *testing.T) {
 	assert.Equal(t, sphinx.Hop{Id: "Mix1", Address: "localhost:3330", PubKey: nodes[0].PubKey}, dePacket.Adr, "Next hop does not match")
 	assert.Equal(t, reflect.TypeOf([]byte{}), reflect.TypeOf(dePacket.Data))
 	assert.Equal(t, "\xF1", dePacket.Flag, reflect.TypeOf(dePacket.Data))
+}
+
+func TestMix_Shuffle(t *testing.T) {
+	providerWorker, err := createProviderWorker()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	numPackets = 1000000
+	for i := 0; i < numPackets; i++ {
+		randTable[i] = 5
+		shuffled[i] = i
+	}
+
+	fmt.Println("Timestamp before the testrun stats : ", time.Now())
+	providerWorker.preprocessShuffle()
+	fmt.Println("Timestamp after the testrun ends : ", time.Now())
 }

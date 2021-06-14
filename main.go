@@ -184,7 +184,7 @@ func main() {
 			panic(err)
 		}
 
-		mixServer, err := server.NewMixServer(*id, *host, *port, pubM, privM, PKI_DIR)
+		mixServer, err := server.NewServer(*id, *host, *port, pubM, privM, PKI_DIR)
 		if err != nil {
 			panic(err)
 		}
@@ -203,7 +203,7 @@ func main() {
 			panic(err)
 		}
 
-		providerServer, err := server.NewProviderServer(*id, *host, *port, pubP, privP, PKI_DIR)
+		providerServer, err := server.NewServer(*id, *host, *port, pubP, privP, PKI_DIR)
 		if err != nil {
 			panic(err)
 		}

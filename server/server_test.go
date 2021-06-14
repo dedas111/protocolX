@@ -21,50 +21,55 @@ import (
 	"github.com/dedas111/protocolX/sphinx"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/stretchr/testify/assert"
+	// "github.com/stretchr/testify/assert"
 
 	"crypto/elliptic"
-	"errors"
+	// "crypto/rand"
+    "crypto/tls"
+	"crypto/x509"
+
+	// "errors"
 	"fmt"
 	"sync"
-    // "time"
-	"io/ioutil"
+    "time"
+	// "io"
+	// "io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
 	"testing"
-	"runtime"
+	// "runtime"
 	"strconv"
 )
 
-var mixServer *MixServer
-var providerServer *ProviderServer
+var remoteServer *Server
+var localServer *Server
 var anotherServer *Server
 
 const (
 	testDatabase = "testDatabase.db"
 )
 
-func createTestProvider() (*ProviderServer, error) {
+func createTestServer() (*Server, error) {
 	pub, priv, err := sphinx.GenerateKeyPair()
 	if err != nil {
 		return nil, err
 	}
 	n := node.NewMix(pub, priv)
-	provider := ProviderServer{host: "localhost", port: "9999", Mix: n}
+	provider := Server{host: "localhost", port: "9999", Mix: n}
 	provider.config = config.MixConfig{Id: provider.id, Host: provider.host, Port: provider.port, PubKey: provider.GetPublicKey()}
 	provider.assignedClients = make(map[string]ClientRecord)
 	provider.aPac = make([]node.MixPacket, 0)
 	return &provider, nil
 }
 
-// func createTestProviderWithPort(serverPort string) (*ProviderServer, error) {
+// func createTestProviderWithPort(serverPort string) (*Server, error) {
 // 	pub, priv, err := sphinx.GenerateKeyPair()
 // 	if err != nil {
 // 		return nil, err
 // 	}
 // 	n := node.NewMix(pub, priv)
-// 	provider := ProviderServer{host: "localhost", port: serverPort, Mix: n}
+// 	provider := Server{host: "localhost", port: serverPort, Mix: n}
 // 	provider.config = config.MixConfig{Id: provider.id, Host: provider.host, Port: provider.port, PubKey: provider.GetPublicKey()}
 // 	provider.assignedClients = make(map[string]ClientRecord)
 // 	provider.aPac = make([]node.MixPacket, 0)
@@ -81,13 +86,13 @@ func createTestProvider() (*ProviderServer, error) {
 // 	return &provider, nil
 // }
 
-func createTestMixnode() (*MixServer, error) {
+func createTestRemoteServer() (*Server, error) {
 	pub, priv, err := sphinx.GenerateKeyPair()
 	if err != nil {
 		return nil, err
 	}
 	n := node.NewMix(pub, priv)
-	mix := MixServer{host: "localhost", port: "9995", Mix: n}
+	mix := Server{host: "localhost", port: "9995", Mix: n}
 	mix.config = config.MixConfig{Id: mix.id, Host: mix.host, Port: mix.port, PubKey: mix.GetPublicKey()}
 	mix.aPac = make([]node.MixPacket, 0)
 
@@ -122,17 +127,20 @@ func clean() {
 
 func TestMain(m *testing.M) {
 	var err error
-	mixServer, err = createTestMixnode()
+	fmt.Println("created nothing.")
+	remoteServer, err = createTestServer()
 	if err != nil {
 		fmt.Println(err)
 		panic(m)
 	}
+	fmt.Println("created remote server.")
 
-	providerServer, err = createTestProvider()
+	localServer, err = createTestServer()
 	if err != nil {
 		fmt.Println(err)
 		panic(m)
 	}
+	fmt.Println("created local server.")
 
 	// anotherServer, err = createTestProviderWithPort("9998")
 	// if err != nil {
@@ -145,18 +153,19 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func TestProviderServer_AuthenticateUser_Pass(t *testing.T) {
-	testToken := []byte("AuthenticationToken")
-	record := ClientRecord{id: "Alice", host: "localhost", port: "1111", pubKey: nil, token: testToken}
-	providerServer.assignedClients["Alice"] = record
-	assert.True(t, providerServer.authenticateUser("Alice", []byte("AuthenticationToken")), " Authentication should be successful")
-}
 
-func TestProviderServer_AuthenticateUser_Fail(t *testing.T) {
-	record := ClientRecord{id: "Alice", host: "localhost", port: "1111", pubKey: nil, token: []byte("AuthenticationToken")}
-	providerServer.assignedClients["Alice"] = record
-	assert.False(t, providerServer.authenticateUser("Alice", []byte("WrongAuthToken")), " Authentication should not be successful")
-}
+// func TestServer_AuthenticateUser_Pass(t *testing.T) {
+// 	testToken := []byte("AuthenticationToken")
+// 	record := ClientRecord{id: "Alice", host: "localhost", port: "1111", pubKey: nil, token: testToken}
+// 	providerServer.assignedClients["Alice"] = record
+// 	assert.True(t, providerServer.authenticateUser("Alice", []byte("AuthenticationToken")), " Authentication should be successful")
+// }
+
+// func TestServer_AuthenticateUser_Fail(t *testing.T) {
+// 	record := ClientRecord{id: "Alice", host: "localhost", port: "1111", pubKey: nil, token: []byte("AuthenticationToken")}
+// 	providerServer.assignedClients["Alice"] = record
+// 	assert.False(t, providerServer.authenticateUser("Alice", []byte("WrongAuthToken")), " Authentication should not be successful")
+// }
 
 func createInbox(id string, t *testing.T) {
 	path := filepath.Join("./inboxes", id)
@@ -185,6 +194,8 @@ func createTestMessage(id string, t *testing.T) {
 	}
 
 }
+/* 
+// We do not need the following tests, because we do not have providers anymore.
 
 func TestProviderServer_FetchMessages_FullInbox(t *testing.T) {
 	clientListener, err := createFakeClientListener("localhost", "9999")
@@ -273,8 +284,8 @@ func TestProviderServer_HandlePullRequest_Fail(t *testing.T) {
 		t.Error(err)
 	}
 	err = providerServer.handlePullRequest(bTestPullRequest)
-	assert.EqualError(t, errors.New("ProviderServer: authentication went wrong"), err.Error(), "HandlePullRequest should return an error if authentication failed")
-}
+	assert.EqualError(t, errors.New("Server: authentication went wrong"), err.Error(), "HandlePullRequest should return an error if authentication failed")
+} 
 
 func TestProviderServer_RegisterNewClient(t *testing.T) {
 	newClient := config.ClientConfig{Id: "NewClient", Host: "localhost", Port: "9998", PubKey: nil}
@@ -311,9 +322,111 @@ func TestProviderServer_HandleAssignRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+*/
+
+func createTlsConnection(port int, t *testing.T) net.Conn {
+    t.Log("Before client loadkeys")
+	cert, err := tls.LoadX509KeyPair("/home/das48/certs2/client.pem", "/home/das48/certs2/client.key")
+    if err != nil {
+        t.Log("server: loadkeys")
+		return nil
+    }
+    config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+    conn, err := tls.Dial("tcp", "127.0.0.1:"+strconv.Itoa(port), &config)
+    if conn == nil {
+        t.Log("Conn is nil")
+		// retunr nil
+    }
+    // defer conn.Close()
+    t.Log("client: connected to: ", conn.RemoteAddr())
+
+    state := conn.ConnectionState()
+    for _, v := range state.PeerCertificates {
+        fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
+        fmt.Println(v.Subject)
+    }
+    t.Log("client: handshake: ", state.HandshakeComplete)
+    t.Log("client: mutual: ", state.NegotiatedProtocolIsMutual)
+
+    // message := "Hello\n"
+    // n, err := io.WriteString(conn, message)
+    // if err != nil {
+    //     logLocal.Info("client: write: %s", err)
+    // }
+    // logLocal.Info("client: wrote %q (%d bytes)", message, n)
+	return conn
+}
+
+func TestServer_TlsConnectionReceive(t *testing.T) {
+	// t.Log("Before the server starts")
+	// time.Sleep(300 * time.Millisecond)
+	// localServer.startTlsServer()
+	
+	var connections = make([]net.Conn, 30)
+	
+	for i := 0; i < 20; i++ {
+		t.Log("After the server starts")
+		// time.Sleep(20 * time.Millisecond)
+        port := 9960 +i
+		connections[i] = createTlsConnection(port, t)
+		if connections[i] == nil {
+			t.Log("Conn is nil")
+			// retunr nil
+		}
+
+		t.Log("After the TLS connection is established")
+		time.Sleep(30 * time.Millisecond)
+	}
+
+	toalPackets := 30000
+	sphinxPacket := createTestPacket(t, "hello world")
+	bSphinxPacket, err := proto.Marshal(sphinxPacket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Timestamp before the testrun stats : ", time.Now())
+
+    var waitgroup sync.WaitGroup
+	for j := 0; j < 20; j++ {
+		waitgroup.Add(1)
+		conn := connections[j]
+        go func(connection net.Conn) {
+			defer waitgroup.Done()
+            for i := 0; i < toalPackets; i++ {
+				_, err := connection.Write(bSphinxPacket)
+				if err != nil {
+					t.Log("There is an error : ", err)
+				} 
+				// else {
+				// 	t.Log("Packet sent with bytes : ", n)
+				// }
+			}
+		}(conn)
+	}
+    waitgroup.Wait()
+	t.Log("Timestamp after the testrun ends : ", time.Now())
+	// t.Log("After the TLS connection is established")
+	// time.Sleep(300 * time.Millisecond)
+	// assert.Equal(t, toalPackets, localServer.runningIndex, "All the messages are not processed.")
+}
+
+// func TestServer_HandleConnection(t *testing.T) {
+// 	serverConn, _ := net.Pipe()
+// 	// errs := make(chan error, 1)
+// 	// serverConn.Write([]byte("test"))
+// 	go func() {
+// 		err := localServer.handleConnection(serverConn)
+// 		if err != nil {
+// 			t.Fatal(err)
+// 		}
+// 		serverConn.Close()
+// 	}()
+// 	// serverConn.Close()
+// }
+
 
 func createTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
-	path := config.E2EPath{IngressProvider: providerServer.config, Mixes: []config.MixConfig{mixServer.config}, EgressProvider: providerServer.config}
+	path := config.E2EPath{IngressProvider: localServer.config, Mixes: []config.MixConfig{remoteServer.config}, EgressProvider: localServer.config}
 	sphinxPacket, err := sphinx.PackForwardMessage(elliptic.P224(), path, []float64{0.1, 0.2, 0.3}, payload)
 	if err != nil {
 		t.Fatal(err)
@@ -322,19 +435,22 @@ func createTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
 	return &sphinxPacket
 }
 
-func TestProviderServer_ReceivedPacket(t *testing.T) {
-	sphinxPacket := createTestPacket(t, "hello world")
-	bSphinxPacket, err := proto.Marshal(sphinxPacket)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = providerServer.receivedPacket(bSphinxPacket)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
+// func TestServer_ReceivedPacket(t *testing.T) {
+// 	sphinxPacket := createTestPacket(t, "hello world")
+// 	bSphinxPacket, err := proto.Marshal(sphinxPacket)
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// 	err = localServer.receivedPacket(bSphinxPacket)
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// }
 
-func TestProviderServer_BatchProcessPacket(t *testing.T) {
+
+/*
+func Server_BatchProcessPacket(t *testing.T) {
+// func TestServer_BatchProcessPacket(t *testing.T) {
 	// packets := make([]node.MixPacket, len(p.aPac)) 
 	// threads := runtime.GOMAXPROCS(0) -2
 	
@@ -355,7 +471,7 @@ func TestProviderServer_BatchProcessPacket(t *testing.T) {
 		// testSize := 2
 		fmt.Println("test:  batch size : ", testSize)
 		// providerServer.aPac = make([]node.MixPacket, 0)
-		providerServer.aPac = make([]node.MixPacket, testSize, testSize)
+		localServer.aPac = make([]node.MixPacket, testSize, testSize)
 	
 		var waitgroup sync.WaitGroup
 	
@@ -383,7 +499,7 @@ func TestProviderServer_BatchProcessPacket(t *testing.T) {
 		wg.Add(testSize)
 		delayBeforeContinute(config.RoundDuration, config.SyncTime)
 		roundAtStart := config.GetRound()
-		// fmt.Println("test: total messages processed : ", len(providerServer.aPac))
+		// fmt.Println("test: total messages processed : ", len(localServer.aPac))
 	
 		for i := 0; i<testSize; i++ {
 			index := i
@@ -393,12 +509,12 @@ func TestProviderServer_BatchProcessPacket(t *testing.T) {
 				// if dummyPacket == nil {
 				// 	t.Fatalf("Something wrong brother, why is the channel empty!")
 				// }
-				err := providerServer.receivedPacketWithIndex(<- dummyQueue, index)
+				err := localServer.receivedPacketWithIndex(<- dummyQueue, index)
 				if err != nil {
 					t.Fatal(err)
 				}
 			} ()
-			// err = providerServer.receivedPacket(bSphinxPacket)
+			// err = localServer.receivedPacket(bSphinxPacket)
 			// if err != nil {
 			// 	t.Fatal(err)
 			// }
@@ -406,10 +522,10 @@ func TestProviderServer_BatchProcessPacket(t *testing.T) {
 	
 		delayBeforeContinute(config.RoundDuration, config.SyncTime)
 		lengthOfChannel := len(dummyQueue)
-		packets := make([]node.MixPacket, len(providerServer.aPac))
-		providerServer.mutex.Lock()
-		copy(packets, providerServer.aPac)
-		providerServer.mutex.Unlock()
+		packets := make([]node.MixPacket, len(localServer.aPac))
+		localServer.mutex.Lock()
+		copy(packets, localServer.aPac)
+		localServer.mutex.Unlock()
 		// lengthAtEnd := countMixPackets(packets)
 	
 		wg.Wait()
@@ -418,7 +534,7 @@ func TestProviderServer_BatchProcessPacket(t *testing.T) {
 		fmt.Println("test: remaining packets in the channel after one round : ", lengthOfChannel)
 
 		fmt.Println("test: total messages initially sent : ", lengthAtStart)
-		fmt.Println("test: total messages processed after all the threads are done : ", countMixPackets(providerServer.aPac))
+		fmt.Println("test: total messages processed after all the threads are done : ", countMixPackets(localServer.aPac))
 		fmt.Println("test: The run started at round : ", roundAtStart)
 		fmt.Println("test: The run ended at round : ", roundAtEnd)
 		// if (roundAtEnd > roundAtStart+1) {
@@ -426,10 +542,11 @@ func TestProviderServer_BatchProcessPacket(t *testing.T) {
 		// 	break
 		// }
 		// assert.Equal(t, roundAtStart+1, roundAtEnd, "The computation took more than one round.")
-		// assert.Equal(t, testSize, len(providerServer.aPac), "All the messages are not processed.")
+		// assert.Equal(t, testSize, len(localServer.aPac), "All the messages are not processed.")
 	}
 	// }
 }
+*/
 
 func countMixPackets(packets []node.MixPacket) int {
 	count := 0
@@ -444,7 +561,7 @@ func countMixPackets(packets []node.MixPacket) int {
 }
 
 // func createNewTestPacket() *sphinx.SphinxPacket {
-// 	path := config.E2EPath{IngressProvider: providerServer.config, Mixes: []config.MixConfig{}, EgressProvider: anotherServer.config}
+// 	path := config.E2EPath{IngressProvider: localServer.config, Mixes: []config.MixConfig{}, EgressProvider: anotherServer.config}
 // 	sphinxPacket, err := sphinx.PackForwardMessage(elliptic.P224(), path, []float64{0.1, 0.2}, "Hello world")
 // 	if err != nil {
 // 		t.Fatal(err)
@@ -461,16 +578,4 @@ func countMixPackets(packets []node.MixPacket) int {
 //     }
 // }
 
-func TestProviderServer_HandleConnection(t *testing.T) {
-	serverConn, _ := net.Pipe()
-	// errs := make(chan error, 1)
-	// serverConn.Write([]byte("test"))
-	go func() {
-		err := providerServer.handleConnection(serverConn)
-		if err != nil {
-			t.Fatal(err)
-		}
-		serverConn.Close()
-	}()
-	// serverConn.Close()
-}
+

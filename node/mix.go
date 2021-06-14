@@ -35,10 +35,10 @@ type MixPacket struct {
 }
 
 var (
-	randTable = []int
-	shuffled = []int
+	randTable = make([]int, 1000000)
+	shuffled = make([]int, 1000000)
 	//packets = []MixPacket*
-	numPackets = int
+	numPackets = 1000000
 	logLocal = logging.PackageLogger()
 )
 // var logLocal = logging.PackageLogger()
@@ -71,7 +71,7 @@ func (m *Mix)ProcessPacketInSameThread(packet []byte) (*MixPacket, error){
 	}
 	
 	mixPacket := MixPacket{newPacket, nextHop, string(commands.Flag)}
-	return &mixPacket, nil
+	return &mixPacket, err
 
 }
 
@@ -81,10 +81,10 @@ func (m *Mix) GetPublicKey() []byte {
 }
 
 
-func () preprocessShuffle() {
-	lastRandIndex = 0
-	for i := numPackets; i >= 1; i-- {
-		j = randTable[lastRandIndex]
+func (m *Mix) preprocessShuffle() {
+	var lastRandIndex = 0
+	for i := numPackets -1; i >= 1; i-- {
+		var j = randTable[lastRandIndex] % i +1
 		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
 		lastRandIndex++
 	}

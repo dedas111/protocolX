@@ -30,7 +30,6 @@ import (
 
 	// "bytes"
 	// "errors"
-	"strconv"
 	// "fmt"
 	// "io"
 	// "io/ioutil"
@@ -51,7 +50,7 @@ var (
 	messageDelivered = 0
 	isMapper = true
 	// runningIndex = 0
-	msgCount = 30000
+	msgCount = 300000
 
 	logLocal = logging.PackageLogger()
 )
@@ -75,7 +74,7 @@ type Server struct {
 	
 	aPac []node.MixPacket
 	mutex sync.Mutex
-	runningIndex []int
+	runningIndex int
 }
 
 type ClientRecord struct {
@@ -91,10 +90,7 @@ type ClientRecord struct {
 // signaling whether any operation was unsuccessful
 func (p *Server) Start() error {
 	p.aPac = make([]node.MixPacket, 0)
-	p.runningIndex = make([]int, 30)
-	for i := 0; i < 20; i++ {
-		p.runningIndex[i] = 0
-	}
+	p.runningIndex = 0
 	p.run()
 	return nil
 }
@@ -130,15 +126,15 @@ func (p *Server) run() {
 // Function processes the received sphinx packet, performs the
 // unwrapping operation and checks whether the packet should be
 // forwarded or stored. If the processing was unsuccessful and error is returned.
-func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
+func (p *Server) receivedPacketWithIndex(packet []byte) error {
 	if isMapper {
 		// p.aPac[index] = packet
-		p.runningIndex[someIndex]++
-		if p.runningIndex[someIndex] == 1 {
+		p.runningIndex++
+		if p.runningIndex == 1 {
 			logLocal.Info("First packet. Time:", time.Now())
-		} else if p.runningIndex[someIndex] == msgCount {
+		} else if p.runningIndex == msgCount {
 			logLocal.Info("Last packet. Time:", time.Now())
-			p.runningIndex[someIndex] = 0
+			p.runningIndex = 0
 		}
 	} else {
 		newPacket, err := p.ProcessPacketInSameThread(packet)
@@ -299,46 +295,37 @@ func (p *Server) startTlsServer() error {
 		return err
     }
     config := tls.Config{Certificates: []tls.Certificate{cert}}
-
-	// someIndex := 0
-	for someIndex := 0; someIndex < 20; someIndex++ {
-		config.Rand = rand.Reader
-		port := 9960 + someIndex
-		service := "127.0.0.1:" + strconv.Itoa(port)
-		listener, err := tls.Listen("tcp", service, &config)
-		if err != nil {
-			// log.Fatalf("server: listen: %s", err)
-			logLocal.Info("server: listen: ", err)
-			return err
-		}
-		logLocal.Info("server: listening")
-
-		go func(localIndex int) {
-			for {
-				conn, err := listener.Accept()
-				if err != nil {
-					logLocal.Info("server: accept: ", err)
-					break
-				}
-				// defer conn.Close()
-				logLocal.Info("server: accepted from ", conn.RemoteAddr())
-				tlscon, ok := conn.(*tls.Conn)
-				if ok {
-					logLocal.Info("ok=true")
-					state := tlscon.ConnectionState()
-					for _, v := range state.PeerCertificates {
-						logLocal.Info(x509.MarshalPKIXPublicKey(v.PublicKey))
-					}
-				}
-				go p.handleClient(conn, localIndex)
-				// someIndex++
-			}
-		}(someIndex)
-	}
+    config.Rand = rand.Reader
+    service := "127.0.0.1:9960"
+    listener, err := tls.Listen("tcp", service, &config)
+    if err != nil {
+        // log.Fatalf("server: listen: %s", err)
+		logLocal.Info("server: listen: ", err)
+		return err
+    }
+    logLocal.Info("server: listening")
+    for {
+        conn, err := listener.Accept()
+        if err != nil {
+            logLocal.Info("server: accept: ", err)
+            break
+        }
+        // defer conn.Close()
+        logLocal.Info("server: accepted from ", conn.RemoteAddr())
+        tlscon, ok := conn.(*tls.Conn)
+        if ok {
+            logLocal.Info("ok=true")
+            state := tlscon.ConnectionState()
+            for _, v := range state.PeerCertificates {
+                logLocal.Info(x509.MarshalPKIXPublicKey(v.PublicKey))
+            }
+        }
+        go p.handleClient(conn)
+    }
 	return nil
 }
 
-func (p *Server) handleClient(conn net.Conn, someIndex int) {
+func (p *Server) handleClient(conn net.Conn) {
     // defer conn.Close()
     buf := make([]byte, 1024)
     for {
@@ -364,7 +351,7 @@ func (p *Server) handleClient(conn net.Conn, someIndex int) {
 		// 	logLocal.WithError(err).Error(err)
 		// 	// return err
 		// }
-		p.receivedPacketWithIndex(buf[:n], someIndex)
+		p.receivedPacketWithIndex(buf[:n])
 
 		// switch string(packet.Flag) {
 		// // case string(assignFlag):
