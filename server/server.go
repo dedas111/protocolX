@@ -51,7 +51,8 @@ var (
 	messageDelivered = 0
 	isMapper = true
 	// runningIndex = 0
-	msgCount = 30000
+	msgCount = 100000
+	threadsCount = 100
 
 	logLocal = logging.PackageLogger()
 )
@@ -74,6 +75,7 @@ type Server struct {
 	config          config.MixConfig
 	
 	aPac []node.MixPacket
+	receivedPackets [][][]byte
 	mutex sync.Mutex
 	runningIndex []int
 }
@@ -91,9 +93,14 @@ type ClientRecord struct {
 // signaling whether any operation was unsuccessful
 func (p *Server) Start() error {
 	p.aPac = make([]node.MixPacket, 0)
-	p.runningIndex = make([]int, 30)
-	for i := 0; i < 20; i++ {
+	p.runningIndex = make([]int, threadsCount)
+	for i := 0; i < threadsCount; i++ {
 		p.runningIndex[i] = 0
+	}
+
+	p.receivedPackets = make([][][] byte, threadsCount)
+	for i := 0; i < threadsCount; i++ {
+		p.receivedPackets[i] = make([][]byte, msgCount)
 	}
 	p.run()
 	return nil
@@ -133,6 +140,7 @@ func (p *Server) run() {
 func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 	if isMapper {
 		// p.aPac[index] = packet
+		p.receivedPackets[someIndex][p.runningIndex[someIndex]] = packet
 		p.runningIndex[someIndex]++
 		if p.runningIndex[someIndex] == 1 {
 			logLocal.Info("First packet. Time:", time.Now())
@@ -301,7 +309,7 @@ func (p *Server) startTlsServer() error {
     config := tls.Config{Certificates: []tls.Certificate{cert}}
 
 	// someIndex := 0
-	for someIndex := 0; someIndex < 20; someIndex++ {
+	for someIndex := 0; someIndex < threadsCount; someIndex++ {
 		config.Rand = rand.Reader
 		port := 9960 + someIndex
 		service := "127.0.0.1:" + strconv.Itoa(port)

@@ -1,10 +1,5 @@
 # Anonymous messaging using mix networks
 
-This is an experimental implementation of an anonymous messaging system based on
-Ania Piotrowska's PhD research.
-
-Note that this is not an officially supported DeepMind product.
-
 ## Setup
 
 To build and test the code you need:
