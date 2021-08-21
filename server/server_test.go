@@ -20,16 +20,20 @@ import (
 	"github.com/dedas111/protocolX/node"
 	"github.com/dedas111/protocolX/sphinx"
 
-	"github.com/golang/protobuf/proto"
-	// "github.com/stretchr/testify/assert"
-
+	//"crypto/curve25519"
+	// "crypto/aes"
+	// "crypto/cipher"
 	"crypto/elliptic"
 	// "crypto/rand"
     "crypto/tls"
 	"crypto/x509"
 
+	"github.com/golang/protobuf/proto"
+	// "github.com/stretchr/testify/assert"
+
 	// "errors"
 	"fmt"
+	// "math/big"
 	"sync"
     "time"
 	// "io"
@@ -45,6 +49,7 @@ import (
 var remoteServer *Server
 var localServer *Server
 var anotherServer *Server
+var curve = elliptic.P224()
 
 const (
 	testDatabase = "testDatabase.db"
@@ -126,6 +131,7 @@ func clean() {
 }
 
 func TestMain(m *testing.M) {
+	// curve = elliptic.P224()
 	var err error
 	fmt.Println("created nothing.")
 	remoteServer, err = createTestServer()
@@ -358,9 +364,9 @@ func createTlsConnection(port int, t *testing.T) net.Conn {
 }
 
 func TestServer_TlsConnectionReceive(t *testing.T) {
-	// if testing.Short() {
-    //     t.Skip("skipping test in short mode.")
-    // }
+	if testing.Short() {
+        t.Skip("skipping test in short mode.")
+    }
 
 	// t.Log("Before the server starts")
 	// time.Sleep(300 * time.Millisecond)
@@ -383,7 +389,7 @@ func TestServer_TlsConnectionReceive(t *testing.T) {
 		time.Sleep(30 * time.Millisecond)
 	}
 
-	toalPackets := 1
+	toalPackets := 10000
 	sphinxPacket := createTestPacket(t, "hello world")
 	// sphinxPacket := createLargeTestPacket(t, "hello world")
 	bSphinxPacket, err := proto.Marshal(sphinxPacket)
@@ -417,9 +423,9 @@ func TestServer_TlsConnectionReceive(t *testing.T) {
 }
 
 func TestServer_TlsMemoryLoad(t *testing.T) {
-	if testing.Short() {
-        t.Skip("skipping test in short mode.")
-    }
+	// if testing.Short() {
+    //     t.Skip("skipping test in short mode.")
+    // }
 
 	// t.Log("Before the server starts")
 	// time.Sleep(300 * time.Millisecond)
@@ -443,7 +449,7 @@ func TestServer_TlsMemoryLoad(t *testing.T) {
 	}
 
 	// totalPackets := 12500 * 4
-	totalPackets := 6000000
+	totalPackets := 1000000
 	sentPackets := make([][] byte, totalPackets)
 	PrintMemUsage()
 	t.Log("Timestamp before the testrun starts : ", time.Now())
@@ -453,6 +459,8 @@ func TestServer_TlsMemoryLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	t.Log("The size of one packet in bytes: ", len(bSphinxPacket))
 
 	for i := 0; i < totalPackets; i++ {
 		sentPackets[i] = make([]byte, len(bSphinxPacket))
@@ -483,6 +491,20 @@ func TestServer_TlsMemoryLoad(t *testing.T) {
 	// t.Log("After the TLS connection is established")
 	// time.Sleep(300 * time.Millisecond)
 	// assert.Equal(t, toalPackets, localServer.runningIndex, "All the messages are not processed.")
+}
+
+func TestServer_SphinxPacketSize(t *testing.T) {
+	// if testing.Short() {
+    //     t.Skip("skipping test in short mode.")
+    // }
+
+	sphinxPacket := createLargeTestPacket(t, fmt.Sprintf("%d : hello world", 343))
+	bSphinxPacket, err := proto.Marshal(sphinxPacket)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("The size of one packet in bytes: ", len(bSphinxPacket))
 }
 
 // PrintMemUsage outputs the current, total and OS memory being used. As well as the number 
@@ -518,7 +540,7 @@ return b / 1024 / 1024
 
 func createTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
 	path := config.E2EPath{IngressProvider: localServer.config, Mixes: []config.MixConfig{remoteServer.config}, EgressProvider: localServer.config}
-	sphinxPacket, err := sphinx.PackForwardMessage(elliptic.P224(), path, []float64{0.1, 0.2, 0.3}, payload)
+	sphinxPacket, err := sphinx.PackForwardMessage(curve, path, []float64{0.1, 0.2, 0.3}, payload)
 	if err != nil {
 		t.Fatal(err)
 		return nil
@@ -527,8 +549,8 @@ func createTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
 }
 
 func createLargeTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
-	path := config.E2EPath{IngressProvider: localServer.config, Mixes: []config.MixConfig{remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config,remoteServer.config}, EgressProvider: localServer.config}
-	sphinxPacket, err := sphinx.PackForwardMessage(elliptic.P224(), path, []float64{0.1, 0.2, 0.3, 0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1}, payload)
+	path := config.E2EPath{IngressProvider: localServer.config, Mixes: []config.MixConfig{remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config}, EgressProvider: localServer.config}
+	sphinxPacket, err := sphinx.PackForwardMessage(curve, path, []float64{0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1}, payload)
 	if err != nil {
 		t.Fatal(err)
 		return nil

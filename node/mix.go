@@ -35,10 +35,10 @@ type MixPacket struct {
 }
 
 var (
-	randTable = make([]int, 1000000)
-	shuffled = make([]int, 1000000)
+	randTable = make([]int, 6000000)
+	shuffled = make([]int, 6000000)
 	//packets = []MixPacket*
-	numPackets = 1000000
+	numPackets = 6000000
 	logLocal = logging.PackageLogger()
 )
 // var logLocal = logging.PackageLogger()

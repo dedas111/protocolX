@@ -22,12 +22,14 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"crypto/elliptic"
+	
 	"os"
 	"reflect"
 	"fmt"
-	// "sync"
+	"sync"
     "time"
 	"testing"
+	// "strconv"
 )
 
 var nodes []config.MixConfig
@@ -118,19 +120,109 @@ func TestMixProcessPacket(t *testing.T) {
 	assert.Equal(t, "\xF1", dePacket.Flag, reflect.TypeOf(dePacket.Data))
 }
 
+func TestMix_BatchProcessPacket(t *testing.T) {
+	if testing.Short() {
+        t.Skip("skipping test in short mode.")
+    }
+	// threads := runtime.GOMAXPROCS(0) -1
+	// fmt.Println("test: the total number of threads used : ", threads)
+	// logLocal.Info("main: case client:  the total number of threads used : ", threads)
+
+	pubD, _, err := sphinx.GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	providerWorker, err := createProviderWorker()
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := config.MixConfig{Id: "Provider", Host: "localhost", Port: "3333", PubKey: providerWorker.pubKey}
+	dest := config.ClientConfig{Id: "Destination", Host: "localhost", Port: "3334", PubKey: pubD, Provider: &provider}
+	mixes, err := createTestMixes()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testSizes := []int{100, 200, 300, 400, 500, 600, 800, 1000, 1200, 1400, 1500, 1600, 1800, 2000, 2500, 3000}
+	// testSizes := []int{2}
+	for _, testSize := range testSizes {	
+		// testSize := 2
+		fmt.Println("test:  batch size : ", testSize)
+		// localServer.aPac = make([]node.MixPacket, testSize, testSize)
+	
+		var waitgroup sync.WaitGroup
+	
+		dummyQueue := make([][]byte, testSize)
+		for j:=0; j<testSize; j++ {
+			waitgroup.Add(1)
+			position := j
+			go func(index int) {
+				defer waitgroup.Done()
+				// payload := strconv.Itoa(97)
+				sphinxPacket, err := createTestPacket(elliptic.P224(), mixes, provider, dest)
+				if err != nil {
+					t.Fatal(err)
+				}
+				bSphinxPacket, err := proto.Marshal(sphinxPacket)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// dummyQueue = append(dummyQueue, bSphinxPacket)
+				dummyQueue[index] = bSphinxPacket
+				// logLocal.Info("dummyQueue is appended with message number ", i)
+			} (position)
+		} 
+		waitgroup.Wait()
+	
+		var wg sync.WaitGroup
+		//lengthAtStart := len(dummyQueue)
+		wg.Add(testSize)
+		t.Log("Timestamp before the testrun starts : ", time.Now())
+		// fmt.Println("test: total messages processed : ", len(localServer.aPac))
+	
+		for i := 0; i<testSize; i++ {
+			index := i
+			go func(position int) {
+				defer wg.Done()
+				// dummyPacket <- dummyQueue
+				// if dummyPacket == nil {
+				// 	t.Fatalf("Something wrong brother, why is the channel empty!")
+				// }
+				_, err := providerWorker.ProcessPacketInSameThread(dummyQueue[position])
+				if err != nil {
+					t.Fatal(err)
+				}
+			} (index)
+			// err = localServer.receivedPacket(bSphinxPacket)
+			// if err != nil {
+			// 	t.Fatal(err)
+			// }
+		}
+	
+		wg.Wait()
+		t.Log("Timestamp after the testrun ends : ", time.Now())
+	}
+}
+
 func TestMix_Shuffle(t *testing.T) {
 	providerWorker, err := createProviderWorker()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	numPackets = 1000000
-	for i := 0; i < numPackets; i++ {
-		randTable[i] = 5
-		shuffled[i] = i
-	}
+	testSizes := []int{200000, 400000, 600000, 800000, 1000000}
+	// testSizes := []int{2}
+	for _, testSize := range testSizes {
+		numPackets = testSize
+		fmt.Println("test:  batch size : ", numPackets)
+		for i := 0; i < numPackets; i++ {
+			randTable[i] = 5
+			shuffled[i] = i
+		}
 
-	fmt.Println("Timestamp before the testrun stats : ", time.Now())
-	providerWorker.preprocessShuffle()
-	fmt.Println("Timestamp after the testrun ends : ", time.Now())
+		fmt.Println("Timestamp before the testrun stats : ", time.Now())
+		providerWorker.preprocessShuffle()
+		fmt.Println("Timestamp after the testrun ends : ", time.Now())
+	}
 }
