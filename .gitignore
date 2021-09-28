@@ -3,3 +3,4 @@ vendor/golang.org
 inboxes/*
 logs/*
 .VSCodeCounter/*
+.idea/*

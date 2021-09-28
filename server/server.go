@@ -15,19 +15,23 @@
 package server
 
 import (
+	"fmt"
 	"github.com/dedas111/protocolX/config"
 	"github.com/dedas111/protocolX/helpers"
 	"github.com/dedas111/protocolX/networker"
 	"github.com/dedas111/protocolX/node"
+	"github.com/dedas111/protocolX/pki"
+
 	// "github.com/dedas111/protocolX/sphinx"
 	"github.com/dedas111/protocolX/logging"
 
 	"github.com/golang/protobuf/proto"
 
 	"crypto/rand"
-    "crypto/tls"
+	"crypto/tls"
 	"crypto/x509"
 
+	mrand "math/rand"
 	// "bytes"
 	// "errors"
 	"strconv"
@@ -38,7 +42,6 @@ import (
 	// "os"
 	"sync"
 	"time"
-	// "math/rand"
 )
 
 var (
@@ -47,14 +50,18 @@ var (
 	tokenFlag  = []byte{0xa9}
 	pullFlag   = []byte{0xff}
 	// handledPackets = 0
-	relayedPackets = 0
+	relayedPackets   = 0
 	messageDelivered = 0
-	isMapper = true
+	isMapper         = true
 	// runningIndex = 0
-	msgCount = 100000
+	msgCount     = 100000
 	threadsCount = 100
 
 	logLocal = logging.PackageLogger()
+)
+
+const (
+	PKI_DIR = "pki/database.db"
 )
 
 type ProviderIt interface {
@@ -69,15 +76,20 @@ type Server struct {
 	host string
 	port string
 	*node.Mix
-	listener *net.TCPListener
+	// listener *net.TCPListener
+	listener net.Listener
+	mixType  string
 
 	assignedClients map[string]ClientRecord
 	config          config.MixConfig
-	
-	aPac []node.MixPacket
+
+	aPac            []node.MixPacket
 	receivedPackets [][][]byte
-	mutex sync.Mutex
-	runningIndex []int
+	mutex           sync.Mutex
+	runningIndex    []int
+
+	// TODO make dynamic with map id/connection
+	connections map[string]*tls.Conn // TLS connection to funnels
 }
 
 type ClientRecord struct {
@@ -98,7 +110,7 @@ func (p *Server) Start() error {
 		p.runningIndex[i] = 0
 	}
 
-	p.receivedPackets = make([][][] byte, threadsCount)
+	p.receivedPackets = make([][][]byte, threadsCount)
 	for i := 0; i < threadsCount; i++ {
 		p.receivedPackets[i] = make([][]byte, msgCount)
 	}
@@ -130,7 +142,7 @@ func (p *Server) run() {
 		logLocal.Infof("Server: Preparing for relaying")
 		p.relayPacket()
 	}()
-	
+
 	<-finish
 }
 
@@ -251,14 +263,15 @@ func (p *Server) send(packet []byte, address string) error {
 // is logged into the log files, but the function is not stopped
 func (p *Server) listenForIncomingConnections() {
 	var wg sync.WaitGroup
-	for i:=0; i<180; i++ {
+	for i := 0; i < 180; i++ {
 		wg.Add(1)
+		// conn, err := p.listener.Accept()
 		conn, err := p.listener.Accept()
 
 		if err != nil {
 			logLocal.WithError(err).Error(err)
 			return
-		} 
+		}
 		go func() {
 			// logLocal.Infof("Server: Received new connection from %s", conn.RemoteAddr())
 			// logLocal.Info("Server: Current round number : ", config.GetRound())
@@ -271,7 +284,7 @@ func (p *Server) listenForIncomingConnections() {
 		}()
 	}
 	wg.Wait()
-	logLocal.Info("Server: packets processing done at round : ", config.GetRound() )
+	logLocal.Info("Server: packets processing done at round : ", config.GetRound())
 	// logLocal.Info("Server: Total packets processed : ", handledPackets )
 }
 
@@ -300,13 +313,13 @@ func (p *Server) relayPacket() error {
 }
 
 func (p *Server) startTlsServer() error {
-    cert, err := tls.LoadX509KeyPair("/home/das48/certs2/server.pem", "/home/das48/certs2/server.key")
-    if err != nil {
-        // log.Fatalf("server: loadkeys: %s", err)
+	cert, err := tls.LoadX509KeyPair("/home/olaf/certs/server.pem", "/home/olaf/certs/server.key")
+	if err != nil {
+		// log.Fatalf("server: loadkeys: %s", err)
 		logLocal.Info("server: loadkeys: ", err)
 		return err
-    }
-    config := tls.Config{Certificates: []tls.Certificate{cert}}
+	}
+	config := tls.Config{Certificates: []tls.Certificate{cert}}
 
 	// someIndex := 0
 	for someIndex := 0; someIndex < threadsCount; someIndex++ {
@@ -347,24 +360,24 @@ func (p *Server) startTlsServer() error {
 }
 
 func (p *Server) handleClient(conn net.Conn, someIndex int) {
-    // defer conn.Close()
-    buf := make([]byte, 1024)
-    for {
-        // logLocal.Info("server: conn: waiting")
-        n, err := conn.Read(buf)
-        if err != nil {
-        	logLocal.Info("server: conn: read: ", err)
-            break
-        }
+	// defer conn.Close()
+	buf := make([]byte, 1024)
+	for {
+		// logLocal.Info("server: conn: waiting")
+		n, err := conn.Read(buf)
+		if err != nil {
+			logLocal.Info("server: conn: read: ", err)
+			break
+		}
 
-        // logLocal.Info("server: conn: echo %q\n", string(buf[:n]))
-        // n, err = conn.Write(buf[:n])
-        // n, err = conn.Write(buf[:n])
-        // logLocal.Info("server: conn: wrote %d bytes", n)
-        // if err != nil {
-        //     logLocal.Info("server: write: %s", err)
-        //     break
-        // }
+		// logLocal.Info("server: conn: echo %q\n", string(buf[:n]))
+		// n, err = conn.Write(buf[:n])
+		// n, err = conn.Write(buf[:n])
+		// logLocal.Info("server: conn: wrote %d bytes", n)
+		// if err != nil {
+		//     logLocal.Info("server: write: %s", err)
+		//     break
+		// }
 
 		// var packet SphinxPacket
 		// err = proto.Unmarshal(buf[:n], &packet)
@@ -398,11 +411,11 @@ func (p *Server) handleClient(conn net.Conn, someIndex int) {
 		// 	logLocal.Info("Server: Packet flag not recognised. Packet dropped")
 		// 	return nil
 		// }
-    }
-    logLocal.Info("server: conn: closed")
+	}
+	logLocal.Info("server: conn: closed")
 }
 
-/* // not required now... 
+/* // not required now...
 func (p *Server) createTlsConnection() {
     cert, err := tls.LoadX509KeyPair("certs/client.pem", "certs/client.key")
     if err != nil {
@@ -513,7 +526,7 @@ func (p *Server) registerNewClient(clientBytes []byte) ([]byte, string, error) {
 
 	return token, address, nil
 }
- 
+
 // Function is responsible for handling the registration request from the client.
 // it registers the client in the list of all registered clients and send
 // an authentication token back to the client.
@@ -536,7 +549,6 @@ func (p *Server) handleAssignRequest(packet []byte) error {
 	return nil
 } */
 
-
 /* // AuthenticateUser compares the authentication token received from the client with
 // the one stored by the provider. If tokens are the same, it returns true
 // and false otherwise.
@@ -551,9 +563,9 @@ func (p *Server) authenticateUser(clientId string, clientToken []byte) bool {
 
 // NewServer constructs a new server object.
 // NewServer returns a new server object and an error.
-func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string) (*Server, error) {
+func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string, mixType string) (*Server, error) {
 	node := node.NewMix(pubKey, prvKey)
-	server := Server{id: id, host: host, port: port, Mix: node, listener: nil}
+	server := Server{id: id, host: host, port: port, Mix: node, listener: nil, mixType: mixType}
 	server.config = config.MixConfig{Id: server.id, Host: server.host, Port: server.port, PubKey: server.GetPublicKey()}
 	server.assignedClients = make(map[string]ClientRecord)
 
@@ -566,15 +578,69 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 		return nil, err
 	}
 
-	addr, err := helpers.ResolveTCPAddress(server.host, server.port)
+	// addr, err := helpers.ResolveTCPAddress(server.host, server.port)
+	addr := server.host + ":" + server.port
 	if err != nil {
 		return nil, err
 	}
-	server.listener, err = net.ListenTCP("tcp", addr)
+	//server.listener, err = net.ListenTCP("tcp", addr)
+	cert, err := tls.LoadX509KeyPair("/home/olaf/certs/server.pem", "/home/olaf/certs/server.key")
+	if err != nil {
+		// log.Fatalf("server: loadkeys: %s", err)
+		logLocal.Info("server: loadkeys: ", err)
+		panic(err)
+	}
+	conf := tls.Config{Certificates: []tls.Certificate{cert}}
+	server.listener, err = tls.Listen("tcp", addr, &conf)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return &server, nil
+}
+
+// Establish a new persistent connection to one of the available funnel nodes
+// choose random funnel
+func (p *Server) establishConnectionToRandomFunnel() {
+	// get current funnels
+	list := helpers.GetCurrentFunnelNodes(5)
+	randNumber := mrand.Int31n(1) // 1=funnelCount-1
+	funnelId := list[randNumber]
+	// check database for nodes which act as funnels
+	db, err := pki.OpenDatabase(PKI_DIR, "sqlite3")
+	if err != nil {
+		panic(err)
+	}
+	row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "Mix"+strconv.Itoa(funnelId), "mix")
+
+	var results []byte
+	err = row.Scan(&results)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	var mixConfig config.MixConfig
+	err = proto.Unmarshal(results, &mixConfig)
+
+	nodeHost := mixConfig.Host
+	nodePort := mixConfig.Port
+
+	// establish a connection with them
+	cert, err := tls.LoadX509KeyPair("certs/client.pem", "certs/client.key")
+	if err != nil {
+		logLocal.Info("compute node: loadkeys: ", err)
+	}
+	config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+	conn, err := tls.Dial("tcp", nodeHost+":"+nodePort, &config)
+	if err != nil {
+		logLocal.Info("compute node: dial: ", err)
+	}
+	logLocal.Info("compute node: connected to: ", conn.RemoteAddr())
+	// state := conn.ConnectionState() Debug Info about connection
+	// add connection to map if it wasn't already in there
+	_, pres := p.connections[strconv.Itoa(funnelId)]
+	if !pres {
+		p.connections[strconv.Itoa(funnelId)] = conn
+	}
 }

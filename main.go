@@ -122,6 +122,7 @@ func main() {
 	port := flag.String("port", "", "The port on which the entity is running")
 	providerId := flag.String("provider", "", "The provider for the client")
 	// clientType := flag.String("clientType", "", "If the client is a sender/recipient")
+	mixType := flag.String("mixType", "", "If the server is compute or funnel node")
 	flag.Parse()
 
 	err := pkiPreSetting(PKI_DIR)
@@ -138,7 +139,7 @@ func main() {
 
 	switch *typ {
 	case "client":
-		threads := runtime.GOMAXPROCS(0) -2
+		threads := runtime.GOMAXPROCS(0) - 2
 		logLocal.Info("main: case client:  the total number of threads used : ", threads)
 
 		db, err := pki.OpenDatabase(PKI_DIR, "sqlite3")
@@ -176,7 +177,7 @@ func main() {
 		}
 
 	case "mix":
-		threads := runtime.GOMAXPROCS(0) -2
+		threads := runtime.GOMAXPROCS(0) - 2
 		logLocal.Info("main: case mix:  the total number of threads used : ", threads)
 
 		pubM, privM, err := sphinx.GenerateKeyPair()
@@ -184,7 +185,7 @@ func main() {
 			panic(err)
 		}
 
-		mixServer, err := server.NewServer(*id, *host, *port, pubM, privM, PKI_DIR)
+		mixServer, err := server.NewServer(*id, *host, *port, pubM, privM, PKI_DIR, *mixType)
 		if err != nil {
 			panic(err)
 		}
@@ -195,7 +196,7 @@ func main() {
 		}
 	case "provider":
 
-		threads := runtime.GOMAXPROCS(0) -2
+		threads := runtime.GOMAXPROCS(0) - 2
 		logLocal.Info("main: case provider: the total number of threads used : ", threads)
 
 		pubP, privP, err := sphinx.GenerateKeyPair()
@@ -203,7 +204,7 @@ func main() {
 			panic(err)
 		}
 
-		providerServer, err := server.NewServer(*id, *host, *port, pubP, privP, PKI_DIR)
+		providerServer, err := server.NewServer(*id, *host, *port, pubP, privP, PKI_DIR, *mixType)
 		if err != nil {
 			panic(err)
 		}

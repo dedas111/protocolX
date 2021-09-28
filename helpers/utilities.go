@@ -19,18 +19,25 @@
 package helpers
 
 import (
-	"github.com/dedas111/protocolX/config"
-	"github.com/dedas111/protocolX/pki"
-
-	"github.com/golang/protobuf/proto"
-
 	"crypto/sha256"
 	"errors"
+	"github.com/dedas111/protocolX/config"
+	"github.com/dedas111/protocolX/pki"
+	"github.com/golang/protobuf/proto"
 	"math/rand"
 	"net"
 	"os"
 	"time"
 )
+
+// TODO make these dynamic
+var rndStringOne = "weoiruhfnviozruehfioseurhtgmqoiamxczmxsdjnbfvuawyegrq9wpejgnmvWE"
+var rndStringTwo = "©ordigoiaseuyrhifgnvhoaiwe4mhafguwy3gr08ue273hr0q23874yhf9iwoemd"
+var startTime time.Time
+
+func init() {
+	startTime = time.Now()
+}
 
 func Permute(slice []config.MixConfig) ([]config.MixConfig, error) {
 	if len(slice) == 0 {
@@ -65,6 +72,29 @@ func RandomExponential(expParam float64) (float64, error) {
 		return 0.0, errors.New("the parameter of exponential distribution has to be larger than zero")
 	}
 	return rand.ExpFloat64() / expParam, nil
+}
+
+// GetCurrentFunnelNodes placeholder function (use 2 funnel nodes)
+// depending on the system time, this function evaluates the current funnel nodes and returns their ids
+func GetCurrentFunnelNodes(nodeCount int) []int {
+	// calculate time since system startup to determine position in string
+	var posInString = (time.Since(startTime).Milliseconds()) % int64(len(rndStringOne)) // mod len for not exceeding bounds
+	if posInString == 0 {
+		// regenerate strings
+	}
+	var runeDataOne = []rune(rndStringOne)
+	var runeDataTwo = []rune(rndStringTwo)
+	firstFunnel := int(runeDataOne[posInString]) % nodeCount
+	secondFunnel := int(runeDataTwo[posInString]) % nodeCount
+
+	if firstFunnel == secondFunnel {
+		secondFunnel++
+	}
+	list := make([]int, 2)
+	list[0] = firstFunnel
+	list[1] = secondFunnel
+	return list
+	// TODO when funnel IDs are the same, increment one of them (when dynamic, use remaining set technique (decrement nodeCount))
 }
 
 func ResolveTCPAddress(host, port string) (*net.TCPAddr, error) {

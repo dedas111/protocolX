@@ -16,6 +16,7 @@ package helpers
 
 import (
 	"github.com/dedas111/protocolX/config"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -157,4 +158,20 @@ func TestRandomSample_Fail(t *testing.T) {
 
 func TestResolveTCPAddress(t *testing.T) {
 	// TO DO: How this should be tested ? And should it even be tested it if it uses a build in function?
+}
+
+func TestGetCurrentFunnelNodes(t *testing.T) {
+	time.Sleep(30 * time.Millisecond) // wait to alter position in string
+	list := GetCurrentFunnelNodes(5)
+	assert.True(t, contains(list, 0)) //r
+	assert.True(t, contains(list, 2)) //i
+}
+
+func contains(s []int, e int) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }

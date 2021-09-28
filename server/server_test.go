@@ -25,7 +25,7 @@ import (
 	// "crypto/cipher"
 	"crypto/elliptic"
 	// "crypto/rand"
-    "crypto/tls"
+	"crypto/tls"
 	"crypto/x509"
 
 	"github.com/golang/protobuf/proto"
@@ -35,15 +35,15 @@ import (
 	"fmt"
 	// "math/big"
 	"sync"
-    "time"
+	"time"
 	// "io"
 	// "io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
-	"testing"
 	"runtime"
 	"strconv"
+	"testing"
 )
 
 var remoteServer *Server
@@ -159,7 +159,6 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-
 // func TestServer_AuthenticateUser_Pass(t *testing.T) {
 // 	testToken := []byte("AuthenticationToken")
 // 	record := ClientRecord{id: "Alice", host: "localhost", port: "1111", pubKey: nil, token: testToken}
@@ -200,7 +199,8 @@ func createTestMessage(id string, t *testing.T) {
 	}
 
 }
-/* 
+
+/*
 // We do not need the following tests, because we do not have providers anymore.
 
 func TestProviderServer_FetchMessages_FullInbox(t *testing.T) {
@@ -291,7 +291,7 @@ func TestProviderServer_HandlePullRequest_Fail(t *testing.T) {
 	}
 	err = providerServer.handlePullRequest(bTestPullRequest)
 	assert.EqualError(t, errors.New("Server: authentication went wrong"), err.Error(), "HandlePullRequest should return an error if authentication failed")
-} 
+}
 
 func TestProviderServer_RegisterNewClient(t *testing.T) {
 	newClient := config.ClientConfig{Id: "NewClient", Host: "localhost", Port: "9998", PubKey: nil}
@@ -331,54 +331,54 @@ func TestProviderServer_HandleAssignRequest(t *testing.T) {
 */
 
 func createTlsConnection(port int, t *testing.T) net.Conn {
-    t.Log("Before client loadkeys")
-	cert, err := tls.LoadX509KeyPair("/home/das48/certs2/client.pem", "/home/das48/certs2/client.key")
-    if err != nil {
-        t.Log("server: loadkeys")
+	t.Log("Before client loadkeys")
+	cert, err := tls.LoadX509KeyPair("/home/olaf/certs/client.pem", "/home/olaf/certs/client.key")
+	if err != nil {
+		t.Log("server: loadkeys")
 		return nil
-    }
-    config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
-    conn, err := tls.Dial("tcp", "127.0.0.1:"+strconv.Itoa(port), &config)
-    if conn == nil {
-        t.Log("Conn is nil")
+	}
+	config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+	conn, err := tls.Dial("tcp", "127.0.0.1:"+strconv.Itoa(port), &config)
+	if conn == nil {
+		t.Log("Conn is nil")
 		// retunr nil
-    }
-    // defer conn.Close()
-    t.Log("client: connected to: ", conn.RemoteAddr())
+	}
+	// defer conn.Close()
+	t.Log("client: connected to: ", conn.RemoteAddr())
 
-    state := conn.ConnectionState()
-    for _, v := range state.PeerCertificates {
-        fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
-        fmt.Println(v.Subject)
-    }
-    t.Log("client: handshake: ", state.HandshakeComplete)
-    t.Log("client: mutual: ", state.NegotiatedProtocolIsMutual)
+	state := conn.ConnectionState()
+	for _, v := range state.PeerCertificates {
+		fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
+		fmt.Println(v.Subject)
+	}
+	t.Log("client: handshake: ", state.HandshakeComplete)
+	t.Log("client: mutual: ", state.NegotiatedProtocolIsMutual)
 
-    // message := "Hello\n"
-    // n, err := io.WriteString(conn, message)
-    // if err != nil {
-    //     logLocal.Info("client: write: %s", err)
-    // }
-    // logLocal.Info("client: wrote %q (%d bytes)", message, n)
+	// message := "Hello\n"
+	// n, err := io.WriteString(conn, message)
+	// if err != nil {
+	//     logLocal.Info("client: write: %s", err)
+	// }
+	// logLocal.Info("client: wrote %q (%d bytes)", message, n)
 	return conn
 }
 
 func TestServer_TlsConnectionReceive(t *testing.T) {
 	if testing.Short() {
-        t.Skip("skipping test in short mode.")
-    }
+		t.Skip("skipping test in short mode.")
+	}
 
 	// t.Log("Before the server starts")
 	// time.Sleep(300 * time.Millisecond)
 	// localServer.startTlsServer()
-	
-	threadsCount = 100
+
+	threadsCount = 2
 	var connections = make([]net.Conn, threadsCount)
-	
+
 	for i := 0; i < threadsCount; i++ {
 		t.Log("After the server starts")
 		// time.Sleep(20 * time.Millisecond)
-        port := 9960 +i
+		port := 9960 + i
 		connections[i] = createTlsConnection(port, t)
 		if connections[i] == nil {
 			t.Log("Conn is nil")
@@ -398,24 +398,24 @@ func TestServer_TlsConnectionReceive(t *testing.T) {
 	}
 	t.Log("Timestamp before the testrun starts : ", time.Now())
 
-    var waitgroup sync.WaitGroup
+	var waitgroup sync.WaitGroup
 	for j := 0; j < threadsCount; j++ {
 		waitgroup.Add(1)
 		conn := connections[j]
-        go func(connection net.Conn) {
+		go func(connection net.Conn) {
 			defer waitgroup.Done()
-            for i := 0; i < toalPackets; i++ {
+			for i := 0; i < toalPackets; i++ {
 				_, err := connection.Write(bSphinxPacket)
 				if err != nil {
 					t.Log("There is an error : ", err)
-				} 
+				}
 				// else {
 				// 	t.Log("Packet sent with bytes : ", n)
 				// }
 			}
 		}(conn)
 	}
-    waitgroup.Wait()
+	waitgroup.Wait()
 	t.Log("Timestamp after the testrun ends : ", time.Now())
 	// t.Log("After the TLS connection is established")
 	// time.Sleep(300 * time.Millisecond)
@@ -424,20 +424,20 @@ func TestServer_TlsConnectionReceive(t *testing.T) {
 
 func TestServer_TlsMemoryLoad(t *testing.T) {
 	// if testing.Short() {
-    //     t.Skip("skipping test in short mode.")
-    // }
+	//     t.Skip("skipping test in short mode.")
+	// }
 
 	// t.Log("Before the server starts")
 	// time.Sleep(300 * time.Millisecond)
 	// localServer.startTlsServer()
-	
+
 	threadsCount = 100
 	var connections = make([]net.Conn, threadsCount)
-	
+
 	for i := 0; i < threadsCount; i++ {
 		t.Log("After the server starts")
 		// time.Sleep(20 * time.Millisecond)
-        port := 9960 +i
+		port := 9960 + i
 		connections[i] = createTlsConnection(port, t)
 		if connections[i] == nil {
 			t.Log("Conn is nil")
@@ -450,7 +450,7 @@ func TestServer_TlsMemoryLoad(t *testing.T) {
 
 	// totalPackets := 12500 * 4
 	totalPackets := 1000000
-	sentPackets := make([][] byte, totalPackets)
+	sentPackets := make([][]byte, totalPackets)
 	PrintMemUsage()
 	t.Log("Timestamp before the testrun starts : ", time.Now())
 
@@ -466,25 +466,25 @@ func TestServer_TlsMemoryLoad(t *testing.T) {
 		sentPackets[i] = make([]byte, len(bSphinxPacket))
 		copy(sentPackets[i], bSphinxPacket)
 	}
-	
+
 	// var waitgroup sync.WaitGroup
 	// for j := 0; j < threadsCount; j++ {
 	// 	waitgroup.Add(1)
 	// 	conn := connections[j]
-    //     go func(connection net.Conn) {
+	//     go func(connection net.Conn) {
 	// 		defer waitgroup.Done()
-    //         for i := 0; i < totalPackets; i++ {
+	//         for i := 0; i < totalPackets; i++ {
 	// 			_, err := connection.Write(bSphinxPacket)
 	// 			if err != nil {
 	// 				t.Log("There is an error : ", err)
-	// 			} 
+	// 			}
 	// 			// else {
 	// 			// 	t.Log("Packet sent with bytes : ", n)
 	// 			// }
 	// 		}
 	// 	}(conn)
 	// }
-    // waitgroup.Wait()
+	// waitgroup.Wait()
 	t.Log("Timestamp after the testrun ends : ", time.Now())
 	PrintMemUsage()
 	// time.Sleep(10000 * time.Millisecond)
@@ -495,8 +495,8 @@ func TestServer_TlsMemoryLoad(t *testing.T) {
 
 func TestServer_SphinxPacketSize(t *testing.T) {
 	// if testing.Short() {
-    //     t.Skip("skipping test in short mode.")
-    // }
+	//     t.Skip("skipping test in short mode.")
+	// }
 
 	sphinxPacket := createLargeTestPacket(t, fmt.Sprintf("%d : hello world", 343))
 	bSphinxPacket, err := proto.Marshal(sphinxPacket)
@@ -507,7 +507,7 @@ func TestServer_SphinxPacketSize(t *testing.T) {
 	t.Log("The size of one packet in bytes: ", len(bSphinxPacket))
 }
 
-// PrintMemUsage outputs the current, total and OS memory being used. As well as the number 
+// PrintMemUsage outputs the current, total and OS memory being used. As well as the number
 // of garage collection cycles completed.
 func PrintMemUsage() {
 	var m runtime.MemStats
@@ -520,7 +520,7 @@ func PrintMemUsage() {
 }
 
 func bToMb(b uint64) uint64 {
-return b / 1024 / 1024
+	return b / 1024 / 1024
 }
 
 // func TestServer_HandleConnection(t *testing.T) {
@@ -536,7 +536,6 @@ return b / 1024 / 1024
 // 	}()
 // 	// serverConn.Close()
 // }
-
 
 func createTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
 	path := config.E2EPath{IngressProvider: localServer.config, Mixes: []config.MixConfig{remoteServer.config}, EgressProvider: localServer.config}
@@ -570,34 +569,33 @@ func createLargeTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
 // 	}
 // }
 
-
 /*
 func Server_BatchProcessPacket(t *testing.T) {
 // func TestServer_BatchProcessPacket(t *testing.T) {
-	// packets := make([]node.MixPacket, len(p.aPac)) 
+	// packets := make([]node.MixPacket, len(p.aPac))
 	// threads := runtime.GOMAXPROCS(0) -2
-	
+
 	threads := runtime.GOMAXPROCS(0) -1
 	fmt.Println("test: the total number of threads used : ", threads)
 	// logLocal.Info("main: case client:  the total number of threads used : ", threads)
 
 	// roundLengths := []time.Duration{500 * time.Millisecond}
 	// roundLengths := []time.Duration{100 * time.Millisecond, 200 * time.Millisecond, 500 * time.Millisecond, 1000 * time.Millisecond}
-	
+
 	// for _, roundDuration := range roundLengths {
 	fmt.Println("---------------------------------------- \n ")
 	fmt.Println("test:  ROUND DURATION : ", config.RoundDuration)
 	fmt.Println("---------------------------------------- \n ")
 	testSizes := []int{10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340, 360, 380, 400, 420, 440, 460, 480, 500, 520, 540, 560, 580, 600}
 	// testSizes := []int{2}
-	for _, testSize := range testSizes {	
+	for _, testSize := range testSizes {
 		// testSize := 2
 		fmt.Println("test:  batch size : ", testSize)
 		// providerServer.aPac = make([]node.MixPacket, 0)
 		localServer.aPac = make([]node.MixPacket, testSize, testSize)
-	
+
 		var waitgroup sync.WaitGroup
-	
+
 		dummyQueue := make(chan []byte, testSize)
 		for j:=0; j<testSize; j++ {
 			waitgroup.Add(1)
@@ -614,16 +612,16 @@ func Server_BatchProcessPacket(t *testing.T) {
 				dummyQueue <- bSphinxPacket
 				// logLocal.Info("dummyQueue is appended with message number ", i)
 			} ()
-		} 
+		}
 		waitgroup.Wait()
-	
+
 		var wg sync.WaitGroup
 		lengthAtStart := len(dummyQueue)
 		wg.Add(testSize)
 		delayBeforeContinute(config.RoundDuration, config.SyncTime)
 		roundAtStart := config.GetRound()
 		// fmt.Println("test: total messages processed : ", len(localServer.aPac))
-	
+
 		for i := 0; i<testSize; i++ {
 			index := i
 			go func() {
@@ -642,7 +640,7 @@ func Server_BatchProcessPacket(t *testing.T) {
 			// 	t.Fatal(err)
 			// }
 		}
-	
+
 		delayBeforeContinute(config.RoundDuration, config.SyncTime)
 		lengthOfChannel := len(dummyQueue)
 		packets := make([]node.MixPacket, len(localServer.aPac))
@@ -650,7 +648,7 @@ func Server_BatchProcessPacket(t *testing.T) {
 		copy(packets, localServer.aPac)
 		localServer.mutex.Unlock()
 		// lengthAtEnd := countMixPackets(packets)
-	
+
 		wg.Wait()
 		roundAtEnd := config.GetRound()
 		fmt.Println("test: total messages processed after one round : ", countMixPackets(packets))
@@ -700,5 +698,3 @@ func countMixPackets(packets []node.MixPacket) int {
 //         big.Len()
 //     }
 // }
-
-
