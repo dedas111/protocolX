@@ -631,40 +631,41 @@ func (p *Server) establishConnectionToRandomFunnel() {
 	list := helpers.GetCurrentFunnelNodes(5)
 	randNumber := mrand.Int31n(1) // 1=funnelCount-1
 	funnelId := list[randNumber]
-	// check database for nodes which act as funnels
-	db, err := pki.OpenDatabase(PKI_DIR, "sqlite3")
-	if err != nil {
-		panic(err)
-	}
-	row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "Mix"+strconv.Itoa(funnelId), "mix")
-
-	var results []byte
-	err = row.Scan(&results)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	var mixConfig config.MixConfig
-	err = proto.Unmarshal(results, &mixConfig)
-
-	nodeHost := mixConfig.Host
-	nodePort := mixConfig.Port
-
-	// establish a connection with them
-	cert, err := tls.LoadX509KeyPair("certs/client.pem", "certs/client.key")
-	if err != nil {
-		logLocal.Info("compute node: loadkeys: ", err)
-	}
-	config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
-	conn, err := tls.Dial("tcp", nodeHost+":"+nodePort, &config)
-	if err != nil {
-		logLocal.Info("compute node: dial: ", err)
-	}
-	logLocal.Info("compute node: connected to: ", conn.RemoteAddr())
-	// state := conn.ConnectionState() Debug Info about connection
-	// add connection to map if it wasn't already in there
+	// check if there already exists a connection to that funnel
 	_, pres := p.connections[strconv.Itoa(funnelId)]
 	if !pres {
+		// check database for nodes which act as funnels
+		db, err := pki.OpenDatabase(PKI_DIR, "sqlite3")
+		if err != nil {
+			panic(err)
+		}
+		row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "Mix"+strconv.Itoa(funnelId), "mix")
+
+		var results []byte
+		err = row.Scan(&results)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		var mixConfig config.MixConfig
+		err = proto.Unmarshal(results, &mixConfig)
+
+		nodeHost := mixConfig.Host
+		nodePort := mixConfig.Port
+
+		// establish a connection with them
+		cert, err := tls.LoadX509KeyPair("certs/client.pem", "certs/client.key")
+		if err != nil {
+			logLocal.Info("compute node: loadkeys: ", err)
+		}
+		config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+		conn, err := tls.Dial("tcp", nodeHost+":"+nodePort, &config)
+		if err != nil {
+			logLocal.Info("compute node: dial: ", err)
+		}
+		logLocal.Info("compute node: connected to: ", conn.RemoteAddr())
+		// state := conn.ConnectionState() Debug Info about connection
+		// add connection to map if
 		p.connections[strconv.Itoa(funnelId)] = conn
 	}
 }
