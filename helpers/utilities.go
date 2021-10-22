@@ -33,11 +33,8 @@ import (
 // TODO make these dynamic
 var rndStringOne = "weoiruhfnviozruehfioseurhtgmqoiamxczmxsdjnbfvuawyegrq9wpejgnmvWE"
 var rndStringTwo = "©ordigoiaseuyrhifgnvhoaiwe4mhafguwy3gr08ue273hr0q23874yhf9iwoemd"
-var startTime time.Time
 
-func init() {
-	startTime = time.Now()
-}
+var alignmentTs, _ = time.Parse(time.RFC3339, "2000-01-01T00:00:00Z")
 
 func Permute(slice []config.MixConfig) ([]config.MixConfig, error) {
 	if len(slice) == 0 {
@@ -78,14 +75,13 @@ func RandomExponential(expParam float64) (float64, error) {
 // depending on the system time, this function evaluates the current funnel nodes and returns their ids
 func GetCurrentFunnelNodes(nodeCount int) []int {
 	// calculate time since system startup to determine position in string
-	var posInString = (time.Since(startTime).Milliseconds()) % int64(len(rndStringOne)) // mod len for not exceeding bounds
-	if posInString == 0 {
-		// regenerate strings
-	}
+	var dur = time.Since(alignmentTs)
+	var stringIndex = dur.Milliseconds() % 64
+
 	var runeDataOne = []rune(rndStringOne)
 	var runeDataTwo = []rune(rndStringTwo)
-	firstFunnel := int(runeDataOne[posInString]) % nodeCount
-	secondFunnel := int(runeDataTwo[posInString]) % nodeCount
+	firstFunnel := int(runeDataOne[stringIndex]) % nodeCount
+	secondFunnel := int(runeDataTwo[stringIndex]) % nodeCount
 
 	if firstFunnel == secondFunnel {
 		secondFunnel++
@@ -93,6 +89,7 @@ func GetCurrentFunnelNodes(nodeCount int) []int {
 	list := make([]int, 2)
 	list[0] = firstFunnel
 	list[1] = secondFunnel
+
 	return list
 	// TODO when funnel IDs are the same, increment one of them (when dynamic, use remaining set technique (decrement nodeCount))
 }

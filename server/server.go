@@ -78,7 +78,6 @@ type Server struct {
 	*node.Mix
 	// listener *net.TCPListener
 	listener net.Listener
-	mixType  string
 
 	assignedClients map[string]ClientRecord
 	config          config.MixConfig
@@ -128,6 +127,31 @@ func (p *Server) run() {
 	defer p.listener.Close()
 	finish := make(chan bool)
 
+	// wait to synchronize with other servers on round start
+	sleepTime := config.GetRemainingRoundTime()
+	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+
+	go func() {
+		// create tick
+		d := time.NewTicker(config.RoundDuration)
+		for {
+			select {
+			case <-d.C:
+				// get current funnels and compare with own id and set server flag
+				listOfFunnels := helpers.GetCurrentFunnelNodes(2)
+				// isMapper false --> compute
+				isMapper = false
+				for _, funnelId := range listOfFunnels {
+					// isMapper true --> funnel
+					serverId, _ := strconv.Atoi(p.id)
+					if funnelId == int(serverId) {
+						isMapper = true
+					}
+				}
+			}
+		}
+	}()
+
 	go func() {
 		logLocal.Infof("Server: Listening on %s", p.host+":"+p.port)
 		p.listenForIncomingConnections()
@@ -150,7 +174,7 @@ func (p *Server) run() {
 // unwrapping operation and checks whether the packet should be
 // forwarded or stored. If the processing was unsuccessful and error is returned.
 func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
-	if isMapper {
+	if isMapper { //delivered to funnel
 		// p.aPac[index] = packet
 		p.receivedPackets[someIndex][p.runningIndex[someIndex]] = packet
 		p.runningIndex[someIndex]++
@@ -160,7 +184,7 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 			logLocal.Info("Last packet. Time:", time.Now())
 			p.runningIndex[someIndex] = 0
 		}
-	} else {
+	} else { //delivered to compute node
 		newPacket, err := p.ProcessPacketInSameThread(packet)
 		if err != nil {
 			return err
@@ -261,7 +285,7 @@ func (p *Server) send(packet []byte, address string) error {
 // passes the incoming packets to the packet handler.
 // If the connection could not be accepted an error
 // is logged into the log files, but the function is not stopped
-func (p *Server) listenForIncomingConnections() {
+func (p *Server) listenForIncomingConnections() { //deprecated
 	var wg sync.WaitGroup
 	for i := 0; i < 180; i++ {
 		wg.Add(1)
@@ -563,9 +587,9 @@ func (p *Server) authenticateUser(clientId string, clientToken []byte) bool {
 
 // NewServer constructs a new server object.
 // NewServer returns a new server object and an error.
-func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string, mixType string) (*Server, error) {
+func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string) (*Server, error) {
 	node := node.NewMix(pubKey, prvKey)
-	server := Server{id: id, host: host, port: port, Mix: node, listener: nil, mixType: mixType}
+	server := Server{id: id, host: host, port: port, Mix: node, listener: nil}
 	server.config = config.MixConfig{Id: server.id, Host: server.host, Port: server.port, PubKey: server.GetPublicKey()}
 	server.assignedClients = make(map[string]ClientRecord)
 

@@ -21,7 +21,7 @@ package config
 
 import (
 	"github.com/golang/protobuf/proto"
-	
+
 	"time"
 )
 
@@ -62,9 +62,9 @@ func (p *E2EPath) Len() int {
 var SyncTime = time.Unix(0, 0)
 
 const (
-	PathLength           	= 0
-	RoundDuration			= 500 * time.Millisecond
-	ClientDuration			= 1 * time.Millisecond
+	PathLength     = 0
+	RoundDuration  = 500 * time.Millisecond
+	ClientDuration = 1 * time.Millisecond
 )
 
 func GetRound() int64 {
@@ -76,6 +76,12 @@ func GetRound() int64 {
 	nextRoundTime := syncTime.Add(currentTime.Sub(syncTime).Truncate(roundDuration)).Add(roundDuration)
 	return int64(nextRoundTime.Sub(currentTime))
 } */
+
+// GetRemainingRoundTime
+// Returns the remaining round time in milliseconds/*
+func GetRemainingRoundTime() int64 {
+	return time.Now().UnixMilli() % RoundDuration.Milliseconds()
+}
 
 func GetReferenceCharacter(index int64) int64 {
 	// TODO: Replace with real CRS implementation
