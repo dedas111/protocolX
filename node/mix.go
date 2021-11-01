@@ -18,8 +18,8 @@
 package node
 
 import (
-	"github.com/dedas111/protocolX/sphinx"
 	"github.com/dedas111/protocolX/logging"
+	"github.com/dedas111/protocolX/sphinx"
 	// "time"
 )
 
@@ -30,23 +30,24 @@ type Mix struct {
 
 type MixPacket struct {
 	Data []byte
-	Adr sphinx.Hop
+	Adr  sphinx.Hop
 	Flag string
 }
 
 var (
 	randTable = make([]int, 6000000)
-	shuffled = make([]int, 6000000)
+	shuffled  = make([]int, 6000000)
 	//packets = []MixPacket*
 	numPackets = 6000000
-	logLocal = logging.PackageLogger()
+	logLocal   = logging.PackageLogger()
 )
+
 // var logLocal = logging.PackageLogger()
 
 // ProcessPacket performs the processing operation on the received packet, including cryptographic operations and
 // extraction of the meta information.
 func (m *Mix) ProcessPacket(packet []byte, c chan<- MixPacket, errCh chan<- error) {
-	
+
 	// logLocal.Info("Mix: Before processing the sphinx packet, time : ", (time.Now()).String())
 	nextHop, commands, newPacket, err := sphinx.ProcessSphinxPacket(packet, m.prvKey)
 	// logLocal.Info("Mix: After processing the sphinx packet, time : ", (time.Now()).String())
@@ -54,14 +55,14 @@ func (m *Mix) ProcessPacket(packet []byte, c chan<- MixPacket, errCh chan<- erro
 		errCh <- err
 		return
 	}
-	
+
 	errCh <- nil
 	c <- MixPacket{newPacket, nextHop, string(commands.Flag)}
 
 }
 
-func (m *Mix)ProcessPacketInSameThread(packet []byte) (*MixPacket, error){
-	
+func (m *Mix) ProcessPacketInSameThread(packet []byte) (*MixPacket, error) {
+
 	// logLocal.Info("Mix: Before processing the sphinx packet, time : ", (time.Now()).String())
 	nextHop, commands, newPacket, err := sphinx.ProcessSphinxPacket(packet, m.prvKey)
 	// logLocal.Info("Mix: After processing the sphinx packet, time : ", (time.Now()).String())
@@ -69,10 +70,21 @@ func (m *Mix)ProcessPacketInSameThread(packet []byte) (*MixPacket, error){
 		// errCh <- err
 		return nil, err
 	}
-	
+
 	mixPacket := MixPacket{newPacket, nextHop, string(commands.Flag)}
 	return &mixPacket, err
 
+}
+
+func (m *Mix) ProcessPacketForRelayInFunnel(packet []byte) (*MixPacket, error) {
+	nextHop, commands, newPacket, err := sphinx.ProcessSphinxPacketWithoutCrypto(packet)
+	if err != nil {
+		// errCh <- err
+		return nil, err
+	}
+
+	mixPacket := MixPacket{newPacket, nextHop, string(commands.Flag)}
+	return &mixPacket, err
 }
 
 // GetPublicKey returns the public key of the mixnode.
@@ -80,11 +92,10 @@ func (m *Mix) GetPublicKey() []byte {
 	return m.pubKey
 }
 
-
 func (m *Mix) preprocessShuffle() {
 	var lastRandIndex = 0
-	for i := numPackets -1; i >= 1; i-- {
-		var j = randTable[lastRandIndex] % i +1
+	for i := numPackets - 1; i >= 1; i-- {
+		var j = randTable[lastRandIndex]%i + 1
 		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
 		lastRandIndex++
 	}
@@ -94,4 +105,3 @@ func (m *Mix) preprocessShuffle() {
 func NewMix(pubKey []byte, prvKey []byte) *Mix {
 	return &Mix{pubKey: pubKey, prvKey: prvKey}
 }
-

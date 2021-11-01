@@ -20,12 +20,11 @@
 package sphinx
 
 import (
-	"github.com/dedas111/protocolX/config"
-	"github.com/dedas111/protocolX/logging"
-
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/elliptic"
+	"github.com/dedas111/protocolX/config"
+	"github.com/dedas111/protocolX/logging"
 
 	"github.com/golang/protobuf/proto"
 
@@ -379,6 +378,22 @@ func ProcessSphinxPacket(packetBytes []byte, privKey []byte) (Hop, Commands, []b
 	}
 
 	return hop, commands, newPacketBytes, nil
+}
+
+// ProcessSphinxPacketWithoutCrypto is used to retrieve routing information for a packet which has to be relayed by the funnel
+// No cryptographic unwrapping is done because funnel nodes just gather and relay messages.
+func ProcessSphinxPacketWithoutCrypto(packetBytes []byte) (Hop, Commands, []byte, error) {
+	var packet SphinxPacket
+	err := proto.Unmarshal(packetBytes, &packet)
+
+	if err != nil {
+		logLocal.WithError(err).Error("Error in ProcessSphinxPacketWithoutCrypto - unmarshal of packet failed")
+		return Hop{}, Commands{}, nil, err
+	}
+	var routingInfo RoutingInfo
+	err = proto.Unmarshal(packet.GetHdr().Beta, &routingInfo)
+	hop, commands, _, _ := readBeta(routingInfo)
+	return hop, commands, packetBytes, nil
 }
 
 // ProcessSphinxHeader unwraps one layer of encryption from the header of a sphinx packet.

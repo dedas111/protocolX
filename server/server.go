@@ -21,7 +21,6 @@ import (
 	"github.com/dedas111/protocolX/networker"
 	"github.com/dedas111/protocolX/node"
 	"github.com/dedas111/protocolX/pki"
-
 	// "github.com/dedas111/protocolX/sphinx"
 	"github.com/dedas111/protocolX/logging"
 
@@ -137,17 +136,8 @@ func (p *Server) run() {
 		for {
 			select {
 			case <-d.C:
-				// get current funnels and compare with own id and set server flag
-				listOfFunnels := helpers.GetCurrentFunnelNodes(2)
-				// isMapper false --> compute
-				isMapper = false
-				for _, funnelId := range listOfFunnels {
-					// isMapper true --> funnel
-					serverId, _ := strconv.Atoi(p.id)
-					if funnelId == int(serverId) {
-						isMapper = true
-					}
-				}
+				p.sendOutboundFunnelMessages()
+				p.setCurrentRole()
 			}
 		}
 	}()
@@ -174,7 +164,7 @@ func (p *Server) run() {
 // unwrapping operation and checks whether the packet should be
 // forwarded or stored. If the processing was unsuccessful and error is returned.
 func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
-	if isMapper { //delivered to funnel
+	if isMapper { //funnel functionality
 		// p.aPac[index] = packet
 		p.receivedPackets[someIndex][p.runningIndex[someIndex]] = packet
 		p.runningIndex[someIndex]++
@@ -184,7 +174,7 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 			logLocal.Info("Last packet. Time:", time.Now())
 			p.runningIndex[someIndex] = 0
 		}
-	} else { //delivered to compute node
+	} else { //compute node functionality
 		newPacket, err := p.ProcessPacketInSameThread(packet)
 		if err != nil {
 			return err
@@ -334,6 +324,15 @@ func (p *Server) relayPacket() error {
 		p.aPac = p.aPac[0:0]
 		p.mutex.Unlock()
 	}
+}
+
+func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
+	newPacket, err := p.ProcessPacketForRelayInFunnel(packetBytes)
+	if err != nil {
+		logLocal.Info("MixServer: Packet couldn't be preprocessed for relay from funnel. Packet dropped")
+		return
+	}
+	p.forwardPacket(newPacket.Data, newPacket.Adr.Address)
 }
 
 func (p *Server) startTlsServer() error {
@@ -667,5 +666,46 @@ func (p *Server) establishConnectionToRandomFunnel() {
 		// state := conn.ConnectionState() Debug Info about connection
 		// add connection to map if
 		p.connections[strconv.Itoa(funnelId)] = conn
+	}
+}
+
+// rearrangeReceivedPackets transfers all packets from the 3D array receivedPackets to a new outbound array and shuffles them
+func (p *Server) rearrangeReceivedPackets() [][]byte {
+	outboundPackets := make([][]byte, 0)
+	for i, _ := range p.receivedPackets {
+		for _, packet := range p.receivedPackets[i] {
+			outboundPackets = append(outboundPackets, packet)
+		}
+	}
+	mrand.Seed(time.Now().Unix())
+	mrand.Shuffle(len(outboundPackets), func(i, j int) {
+		outboundPackets[i], outboundPackets[j] = outboundPackets[j], outboundPackets[i]
+	})
+	return outboundPackets
+}
+
+func (p *Server) setCurrentRole() {
+	// get current funnels and compare with own id and set server flag
+	listOfFunnels := helpers.GetCurrentFunnelNodes(2)
+	// isMapper false --> compute, reset flag
+	isMapper = false
+	for _, funnelId := range listOfFunnels {
+		// isMapper true --> funnel
+		serverId, _ := strconv.Atoi(p.id)
+		if funnelId == int(serverId) {
+			isMapper = true
+		}
+	}
+}
+
+func (p *Server) sendOutboundFunnelMessages() {
+	// reduce dimension of outbound packet array
+	outboundPackets := p.rearrangeReceivedPackets()
+	// relay packets here if funnel
+	if isMapper {
+		// make sending multithreaded?
+		for _, packet := range outboundPackets {
+			p.relayPacketAsFunnel(packet)
+		}
 	}
 }

@@ -74,7 +74,7 @@ func RandomExponential(expParam float64) (float64, error) {
 // GetCurrentFunnelNodes placeholder function (use 2 funnel nodes)
 // depending on the system time, this function evaluates the current funnel nodes and returns their ids
 func GetCurrentFunnelNodes(nodeCount int) []int {
-	// calculate time since system startup to determine position in string
+	// calculate time since alignmentTs to determine position in string
 	var dur = time.Since(alignmentTs)
 	var stringIndex = dur.Milliseconds() % 64
 
