@@ -455,3 +455,31 @@ func TestProcessSphinxPayload(t *testing.T) {
 	}
 	assert.Equal(t, []byte(message), decMsg)
 }
+
+func TestProcessSphinxPacketWithoutCrypto(t *testing.T) {
+	c := Commands{Delay: 0.1}
+	message := "Plaintext message"
+
+	routing := RoutingInfo{NextHop: &Hop{"DestinationId", "DestinationAddress", []byte{}}, RoutingCommands: &c,
+		NextHopMetaData: []byte{}, Mac: []byte{}}
+
+	routingBytes, err := proto.Marshal(&routing)
+	if err != nil {
+		t.Error(err)
+	}
+
+	var packet SphinxPacket
+	packet.Hdr = &Header{[]byte{}, routingBytes, []byte{}}
+	packet.Pld = []byte(message)
+
+	packetBytes, _ := proto.Marshal(&packet)
+
+	hop, _, samePacket, err := ProcessSphinxPacketWithoutCrypto(packetBytes)
+	if err != nil {
+		t.Error(err)
+	}
+
+	assert.Equal(t, "DestinationId", hop.Id)
+	assert.Equal(t, "DestinationAddress", hop.Address)
+	assert.Equal(t, packetBytes, samePacket)
+}
