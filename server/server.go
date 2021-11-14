@@ -638,7 +638,7 @@ func (p *Server) establishConnectionToRandomFunnel() {
 		if err != nil {
 			panic(err)
 		}
-		row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "Mix"+strconv.Itoa(funnelId), "mix")
+		row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "Provider"+strconv.Itoa(funnelId), "provider")
 
 		var results []byte
 		err = row.Scan(&results)
@@ -672,8 +672,11 @@ func (p *Server) establishConnectionToRandomFunnel() {
 // rearrangeReceivedPackets transfers all packets from the 3D array receivedPackets to a new outbound array and shuffles them
 func (p *Server) rearrangeReceivedPackets() [][]byte {
 	outboundPackets := make([][]byte, 0)
-	for i, _ := range p.receivedPackets {
-		for _, packet := range p.receivedPackets[i] {
+	// iterate over the packages of each thread but just until the index marking new packages ends so nothing is sent multiple times
+	for i, packagesPerThread := range p.receivedPackets {
+		numOfPacketsInThread := p.runningIndex[i]
+		newPackages := packagesPerThread[:numOfPacketsInThread]
+		for _, packet := range newPackages {
 			outboundPackets = append(outboundPackets, packet)
 		}
 	}
@@ -681,6 +684,10 @@ func (p *Server) rearrangeReceivedPackets() [][]byte {
 	mrand.Shuffle(len(outboundPackets), func(i, j int) {
 		outboundPackets[i], outboundPackets[j] = outboundPackets[j], outboundPackets[i]
 	})
+	// reset indices to use in next round
+	for i := 0; i < threadsCount; i++ {
+		p.runningIndex[i] = 0
+	}
 	return outboundPackets
 }
 
@@ -699,13 +706,14 @@ func (p *Server) setCurrentRole() {
 }
 
 func (p *Server) sendOutboundFunnelMessages() {
-	// reduce dimension of outbound packet array
-	outboundPackets := p.rearrangeReceivedPackets()
-	// relay packets here if funnel
-	if isMapper {
-		// make sending multithreaded?
-		for _, packet := range outboundPackets {
-			p.relayPacketAsFunnel(packet)
+	if len(p.receivedPackets) > 0 {
+		// reduce dimension of outbound packet array
+		outboundPackets := p.rearrangeReceivedPackets()
+		// relay packets here if funnel
+		if isMapper {
+			for _, packet := range outboundPackets {
+				p.relayPacketAsFunnel(packet)
+			}
 		}
 	}
 }
