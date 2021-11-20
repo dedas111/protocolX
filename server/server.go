@@ -142,10 +142,12 @@ func (p *Server) run() {
 		}
 	}()
 
-	go func() {
-		logLocal.Infof("Server: Listening on %s", p.host+":"+p.port)
-		p.listenForIncomingConnections()
-	}()
+	/*
+		go func() {
+			logLocal.Infof("Server: Listening on %s", p.host+":"+p.port)
+			p.listenForIncomingConnections()
+		}()
+	*/
 
 	go func() {
 		logLocal.Infof("Server: Starting the TLS server")
@@ -347,7 +349,8 @@ func (p *Server) startTlsServer() error {
 	// someIndex := 0
 	for someIndex := 0; someIndex < threadsCount; someIndex++ {
 		config.Rand = rand.Reader
-		port := 9960 + someIndex
+		intPort, _ := strconv.Atoi(p.port)
+		port := intPort + someIndex
 		service := "127.0.0.1:" + strconv.Itoa(port)
 		listener, err := tls.Listen("tcp", service, &config)
 		if err != nil {
