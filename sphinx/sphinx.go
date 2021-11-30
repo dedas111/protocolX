@@ -385,13 +385,15 @@ func ProcessSphinxPacket(packetBytes []byte, privKey []byte) (Hop, Commands, []b
 func ProcessSphinxPacketWithoutCrypto(packetBytes []byte) (Hop, Commands, []byte, error) {
 	var packet SphinxPacket
 	err := proto.Unmarshal(packetBytes, &packet)
-
 	if err != nil {
 		logLocal.WithError(err).Error("Error in ProcessSphinxPacketWithoutCrypto - unmarshal of packet failed")
 		return Hop{}, Commands{}, nil, err
 	}
 	var routingInfo RoutingInfo
-	err = proto.Unmarshal(packet.GetHdr().Beta, &routingInfo)
+	err = proto.Unmarshal(packet.GetHdr().Beta, &routingInfo) // here there might be some fixing needed because beta might not be correct
+	if err != nil {
+		panic(err)
+	}
 	hop, commands, _, _ := readBeta(routingInfo)
 	return hop, commands, packetBytes, nil
 }

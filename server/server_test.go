@@ -18,8 +18,8 @@ import (
 	"github.com/dedas111/protocolX/config"
 	"github.com/dedas111/protocolX/helpers"
 	"github.com/dedas111/protocolX/node"
+	"github.com/dedas111/protocolX/pki"
 	"github.com/dedas111/protocolX/sphinx"
-
 	//"crypto/curve25519"
 	// "crypto/aes"
 	// "crypto/cipher"
@@ -389,7 +389,7 @@ func TestServer_TlsConnectionReceive(t *testing.T) {
 		time.Sleep(30 * time.Millisecond)
 	}
 
-	toalPackets := 10000
+	toalPackets := 5
 	sphinxPacket := createTestPacket(t, "hello world")
 	// sphinxPacket := createLargeTestPacket(t, "hello world")
 	bSphinxPacket, err := proto.Marshal(sphinxPacket)
@@ -507,6 +507,25 @@ func TestServer_SphinxPacketSize(t *testing.T) {
 	t.Log("The size of one packet in bytes: ", len(bSphinxPacket))
 }
 
+// TestServer_CheckMultipleFunnels
+// run integrationtest_preparation first!
+func TestServer_CheckMultipleFunnels(t *testing.T) {
+	db, err := pki.OpenDatabase("/home/olaf/GolandProjects/protocolX/"+PKI_DIR, "sqlite3")
+	if err != nil {
+		panic(err)
+	}
+	// row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "Provider"+strconv.Itoa(1), "provider")
+	row := db.QueryRow("SELECT Id FROM Pki WHERE Typ = ?", "Provider")
+
+	var results []byte
+	err = row.Scan(&results)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	fmt.Println(results)
+}
+
 // PrintMemUsage outputs the current, total and OS memory being used. As well as the number
 // of garage collection cycles completed.
 func PrintMemUsage() {
@@ -538,7 +557,22 @@ func bToMb(b uint64) uint64 {
 // }
 
 func createTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
-	path := config.E2EPath{IngressProvider: localServer.config, Mixes: []config.MixConfig{remoteServer.config}, EgressProvider: localServer.config}
+	db, err := pki.OpenDatabase("/home/olaf/GolandProjects/protocolX/"+PKI_DIR, "sqlite3")
+	if err != nil {
+		panic(err)
+	}
+	row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "8", "Provider")
+
+	var results []byte
+	err = row.Scan(&results)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	var mixConfig config.MixConfig
+	err = proto.Unmarshal(results, &mixConfig)
+
+	path := config.E2EPath{IngressProvider: mixConfig, Mixes: []config.MixConfig{mixConfig}, EgressProvider: mixConfig}
 	sphinxPacket, err := sphinx.PackForwardMessage(curve, path, []float64{0.1, 0.2, 0.3}, payload)
 	if err != nil {
 		t.Fatal(err)

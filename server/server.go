@@ -54,7 +54,7 @@ var (
 	isMapper         = true
 	// runningIndex = 0
 	msgCount     = 100000
-	threadsCount = 100
+	threadsCount = 5
 
 	logLocal = logging.PackageLogger()
 )
@@ -122,7 +122,6 @@ func (p *Server) GetConfig() config.MixConfig {
 
 // Function opens the listener to start listening on provider's host and port
 func (p *Server) run() {
-
 	defer p.listener.Close()
 	finish := make(chan bool)
 
@@ -138,6 +137,7 @@ func (p *Server) run() {
 			case <-d.C:
 				p.sendOutboundFunnelMessages()
 				p.setCurrentRole()
+				// logLocal.Info("Is funnel: ", isMapper)
 			}
 		}
 	}()
@@ -701,7 +701,7 @@ func (p *Server) setCurrentRole() {
 	isMapper = false
 	for _, funnelId := range listOfFunnels {
 		// isMapper true --> funnel
-		serverId, _ := strconv.Atoi(p.id)
+		serverId, _ := strconv.Atoi(p.id) // this just works with IDs that dont contain ASCII characters
 		if funnelId == int(serverId) {
 			isMapper = true
 		}
