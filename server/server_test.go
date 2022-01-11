@@ -531,7 +531,44 @@ func TestServer_CheckMultipleFunnels(t *testing.T) {
 }
 
 func TestServer_EndToEnd(t *testing.T) {
+	threadsCount = 2
+	var connections = make([]net.Conn, threadsCount)
 
+	for i := 0; i < threadsCount; i++ {
+		t.Log("After the server starts")
+		port := 9900 + i // compute node acts as provider (takes client messages)
+		connections[i] = createTlsConnection(port, t)
+		if connections[i] == nil {
+			t.Log("Conn is nil")
+		}
+
+		t.Log("After the TLS connection is established")
+		time.Sleep(30 * time.Millisecond)
+	}
+	sphinxPacket := createStaticTestPacket(t, "hello world")
+	bSphinxPacket, err := proto.Marshal(sphinxPacket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	totalPackets := 3
+	t.Log("Timestamp before the testrun starts : ", time.Now())
+
+	var waitgroup sync.WaitGroup
+	for j := 0; j < threadsCount; j++ {
+		waitgroup.Add(1)
+		conn := connections[j]
+		go func(connection net.Conn) {
+			defer waitgroup.Done()
+			for i := 0; i < totalPackets; i++ {
+				_, err := connection.Write(bSphinxPacket)
+				if err != nil {
+					t.Log("There is an error : ", err)
+				}
+			}
+		}(conn)
+	}
+	waitgroup.Wait()
+	t.Log("Timestamp after the testrun ends : ", time.Now())
 }
 
 // PrintMemUsage outputs the current, total and OS memory being used. As well as the number
