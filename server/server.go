@@ -53,8 +53,9 @@ var (
 	messageDelivered = 0
 	isMapper         = true
 	// runningIndex = 0
-	msgCount     = 100000
-	threadsCount = 5
+	msgCount         = 100000
+	threadsCount     = 5
+	staticServerRole = ""
 
 	logLocal = logging.PackageLogger()
 )
@@ -138,7 +139,16 @@ func (p *Server) run() {
 			select {
 			case <-d.C:
 				p.sendOutboundFunnelMessages()
-				p.setCurrentRole()
+				// TODO: remove if after performance testing
+				if !(staticServerRole == "funnel" || staticServerRole == "compute") {
+					p.setCurrentRole()
+				} else {
+					if staticServerRole == "funnel" {
+						isMapper = true
+					} else {
+						isMapper = false
+					}
+				}
 				// logLocal.Info("Is funnel: ", isMapper)
 			}
 		}
@@ -591,7 +601,8 @@ func (p *Server) authenticateUser(clientId string, clientToken []byte) bool {
 
 // NewServer constructs a new server object.
 // NewServer returns a new server object and an error.
-func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string) (*Server, error) {
+func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string, staticRole string) (*Server, error) {
+	staticServerRole = staticRole
 	node := node.NewMix(pubKey, prvKey)
 	server := Server{id: id, host: host, port: port, Mix: node, listener: nil}
 	server.config = config.MixConfig{Id: server.id, Host: server.host, Port: server.port, PubKey: server.GetPublicKey()}
@@ -712,10 +723,10 @@ func (p *Server) setCurrentRole() {
 
 func (p *Server) sendOutboundFunnelMessages() {
 	if len(p.receivedPackets) > 0 {
-		// reduce dimension of outbound packet array
-		outboundPackets := p.rearrangeReceivedPackets()
 		// relay packets here if funnel
 		if isMapper {
+			// reduce dimension of outbound packet array
+			outboundPackets := p.rearrangeReceivedPackets()
 			for _, packet := range outboundPackets {
 				p.relayPacketAsFunnel(packet)
 			}

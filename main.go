@@ -122,6 +122,7 @@ func main() {
 	port := flag.String("port", "", "The port on which the entity is running")
 	providerId := flag.String("provider", "", "The provider for the client")
 	// clientType := flag.String("clientType", "", "If the client is a sender/recipient")
+	staticRole := flag.String("staticRole", "", "Debug flag to set server to compute or funnel functionality")
 	flag.Parse()
 
 	err := pkiPreSetting(PKI_DIR)
@@ -184,7 +185,7 @@ func main() {
 			panic(err)
 		}
 
-		mixServer, err := server.NewServer(*id, *host, *port, pubM, privM, PKI_DIR)
+		mixServer, err := server.NewServer(*id, *host, *port, pubM, privM, PKI_DIR, *staticRole)
 		if err != nil {
 			panic(err)
 		}
@@ -203,7 +204,7 @@ func main() {
 			panic(err)
 		}
 
-		providerServer, err := server.NewServer(*id, *host, *port, pubP, privP, PKI_DIR)
+		providerServer, err := server.NewServer(*id, *host, *port, pubP, privP, PKI_DIR, *staticRole)
 		if err != nil {
 			panic(err)
 		}
