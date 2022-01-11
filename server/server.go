@@ -643,9 +643,17 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 // choose random funnel
 func (p *Server) establishConnectionToRandomFunnel() {
 	// get current funnels
-	list := helpers.GetCurrentFunnelNodes(globalNodeCount)
-	randNumber := mrand.Int31n(int32(len(list) - 1)) // 1=funnelCount-1
-	funnelId := list[randNumber]
+	// TODO: re-enable after performance testing, DIRTY HACK!!
+	//list := helpers.GetCurrentFunnelNodes(globalNodeCount)
+	//randNumber := mrand.Int31n(int32(len(list) - 1)) // 1=funnelCount-1
+	//funnelId := list[randNumber]
+
+	funnelId := 0
+	if config.GetRound()%2 == 0 {
+		funnelId = 2
+	} else {
+		funnelId = 3
+	}
 	// check if there already exists a connection to that funnel
 	_, pres := p.connections[strconv.Itoa(funnelId)]
 	if !pres {

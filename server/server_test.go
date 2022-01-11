@@ -623,19 +623,38 @@ func createTestPacketForDynamicFunnels(t *testing.T, payload string) *sphinx.Sph
 	var mixConfigCompute config.MixConfig
 	err = proto.Unmarshal(results, &mixConfigCompute)
 
-	// get a funnel node
-	randId = mrand.Int31n(int32(len(funnels) - 1))
-	row = db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", randId, "provider")
+	// create packet
+	path := config.E2EPath{IngressProvider: localServer.config, Mixes: []config.MixConfig{mixConfigCompute}, EgressProvider: localServer.config}
+	sphinxPacket, err := sphinx.PackForwardMessage(curve, path, []float64{0.1, 0.2, 0.3}, payload)
+	if err != nil {
+		t.Fatal(err)
+		return nil
+	}
+	return &sphinxPacket
+}
 
+func createStaticTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
+	db, err := pki.OpenDatabase("/home/olaf/GolandProjects/protocolX/"+PKI_DIR, "sqlite3")
+	if err != nil {
+		panic(err)
+	}
+
+	// create configs for compute node
+	row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "1", "provider")
+
+	var results []byte
 	err = row.Scan(&results)
 	if err != nil {
 		fmt.Println(err)
 	}
-	var mixConfigFunnel config.MixConfig
-	err = proto.Unmarshal(results, &mixConfigFunnel)
+	var computeConfig config.MixConfig
+	err = proto.Unmarshal(results, &computeConfig)
+
+	// create ClientConfig for recipient
+	clientConfig := config.ClientConfig{Id: "1", Host: "localhost", Port: "50000", Provider: &localServer.config}
 
 	// create packet
-	path := config.E2EPath{IngressProvider: localServer.config, Mixes: []config.MixConfig{mixConfigCompute, mixConfigFunnel}, EgressProvider: localServer.config}
+	path := config.E2EPath{IngressProvider: localServer.config, Mixes: []config.MixConfig{computeConfig}, EgressProvider: localServer.config, Recipient: clientConfig}
 	sphinxPacket, err := sphinx.PackForwardMessage(curve, path, []float64{0.1, 0.2, 0.3}, payload)
 	if err != nil {
 		t.Fatal(err)
