@@ -1,5 +1,5 @@
 #!/bin/sh
-# run this before running go test ./server (Server Tests)
+# run before multiple funnels test
 
 echo "Press CTRL-C to stop."
 rm -rf "$(pwd)/pki/database.db"
@@ -14,12 +14,12 @@ else
     echo "Created logging directory"
 fi
 
-NUMMIXES=2
-
-for (( j=0; j<$NUMMIXES; j+20 ));
+NUMMIXES=3
+for (( j=0; j<$NUMMIXES; j++ ));
 do
-    go run main.go -typ=provider -id="Provider$j" -host=localhost -port=$((9980+$j)) >> logs/bash.log &
-    sleep 1
+	#echo $((9900+j*10))
+	go run main.go -typ=provider -id="$j" -host=localhost -port=$((9900+j*10)) >> logs/bash.log &
+	sleep 1
 done
 
 # read -p "Press CTRL-C to stop."

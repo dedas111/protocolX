@@ -91,7 +91,7 @@ func GetCurrentFunnelNodes(nodeCount int) []int {
 	list[1] = secondFunnel
 
 	return list
-	// TODO when funnel IDs are the same, increment one of them (when dynamic, use remaining set technique (decrement nodeCount))
+	// TODO use remaining set technique (decrement nodeCount)
 }
 
 func ResolveTCPAddress(host, port string) (*net.TCPAddr, error) {
@@ -229,4 +229,19 @@ func GetLocalIP() (string, error) {
 	}
 
 	return "", errors.New("Couldn't find the valid IP. Check internet connection.")
+}
+
+func CreateRangedSlice(start, end int) []int {
+	a := make([]int, end-start+1)
+	for i := range a {
+		a[i] = start + i
+	}
+	return a
+}
+
+// does not maintain order
+func RemoveIndexFromSlice(slice []int, indexToRemove int) {
+	slice[indexToRemove] = slice[len(slice)-1]
+	slice[len(slice)-1] = 0
+	slice = slice[:len(slice)-1]
 }

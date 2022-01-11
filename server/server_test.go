@@ -16,10 +16,12 @@ package server
 
 import (
 	"github.com/dedas111/protocolX/config"
-	"github.com/dedas111/protocolX/helpers"
+	helpers "github.com/dedas111/protocolX/helpers"
 	"github.com/dedas111/protocolX/node"
 	"github.com/dedas111/protocolX/pki"
 	"github.com/dedas111/protocolX/sphinx"
+	mrand "math/rand"
+
 	//"crypto/curve25519"
 	// "crypto/aes"
 	// "crypto/cipher"
@@ -389,7 +391,7 @@ func TestServer_TlsConnectionReceive(t *testing.T) {
 		time.Sleep(30 * time.Millisecond)
 	}
 
-	toalPackets := 5
+	totalPackets := 5
 	sphinxPacket := createTestPacket(t, "hello world")
 	// sphinxPacket := createLargeTestPacket(t, "hello world")
 	bSphinxPacket, err := proto.Marshal(sphinxPacket)
@@ -404,7 +406,7 @@ func TestServer_TlsConnectionReceive(t *testing.T) {
 		conn := connections[j]
 		go func(connection net.Conn) {
 			defer waitgroup.Done()
-			for i := 0; i < toalPackets; i++ {
+			for i := 0; i < totalPackets; i++ {
 				_, err := connection.Write(bSphinxPacket)
 				if err != nil {
 					t.Log("There is an error : ", err)
@@ -419,7 +421,7 @@ func TestServer_TlsConnectionReceive(t *testing.T) {
 	t.Log("Timestamp after the testrun ends : ", time.Now())
 	// t.Log("After the TLS connection is established")
 	// time.Sleep(300 * time.Millisecond)
-	// assert.Equal(t, toalPackets, localServer.runningIndex, "All the messages are not processed.")
+	// assert.Equal(t, totalPackets, localServer.runningIndex, "All the messages are not processed.")
 }
 
 func TestServer_TlsMemoryLoad(t *testing.T) {
@@ -524,6 +526,12 @@ func TestServer_CheckMultipleFunnels(t *testing.T) {
 	}
 
 	fmt.Println(results)
+
+	// Create Message and send it to funnel using compute node
+}
+
+func TestServer_EndToEnd(t *testing.T) {
+
 }
 
 // PrintMemUsage outputs the current, total and OS memory being used. As well as the number
@@ -561,7 +569,7 @@ func createTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
 	if err != nil {
 		panic(err)
 	}
-	row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "8", "Provider")
+	row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "8", "Provider") // for TLSreceive test ID has to be out of range to ensure stable compute functionality
 
 	var results []byte
 	err = row.Scan(&results)
@@ -584,6 +592,51 @@ func createTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
 func createLargeTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
 	path := config.E2EPath{IngressProvider: localServer.config, Mixes: []config.MixConfig{remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config, remoteServer.config}, EgressProvider: localServer.config}
 	sphinxPacket, err := sphinx.PackForwardMessage(curve, path, []float64{0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1}, payload)
+	if err != nil {
+		t.Fatal(err)
+		return nil
+	}
+	return &sphinxPacket
+}
+
+func createTestPacketForDynamicFunnels(t *testing.T, payload string) *sphinx.SphinxPacket {
+	funnels := helpers.GetCurrentFunnelNodes(globalNodeCount)
+	db, err := pki.OpenDatabase("/home/olaf/GolandProjects/protocolX/"+PKI_DIR, "sqlite3")
+	if err != nil {
+		panic(err)
+	}
+
+	// make list with all nodes and remove funnels to get remaining compute nodes
+	nodeIds := helpers.CreateRangedSlice(1, globalNodeCount) // nodeIds has to start with the same Ids as the server ID while spawning
+	for _, funndelId := range funnels {
+		helpers.RemoveIndexFromSlice(nodeIds, funndelId-1) //-1 because slices are 0-indexed
+	}
+	// get a random compute node
+	randId := mrand.Int31n(int32(len(nodeIds) - 1))
+	row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", randId, "provider")
+
+	var results []byte
+	err = row.Scan(&results)
+	if err != nil {
+		fmt.Println(err)
+	}
+	var mixConfigCompute config.MixConfig
+	err = proto.Unmarshal(results, &mixConfigCompute)
+
+	// get a funnel node
+	randId = mrand.Int31n(int32(len(funnels) - 1))
+	row = db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", randId, "provider")
+
+	err = row.Scan(&results)
+	if err != nil {
+		fmt.Println(err)
+	}
+	var mixConfigFunnel config.MixConfig
+	err = proto.Unmarshal(results, &mixConfigFunnel)
+
+	// create packet
+	path := config.E2EPath{IngressProvider: localServer.config, Mixes: []config.MixConfig{mixConfigCompute, mixConfigFunnel}, EgressProvider: localServer.config}
+	sphinxPacket, err := sphinx.PackForwardMessage(curve, path, []float64{0.1, 0.2, 0.3}, payload)
 	if err != nil {
 		t.Fatal(err)
 		return nil

@@ -61,6 +61,8 @@ var (
 
 const (
 	PKI_DIR = "pki/database.db"
+	// TODO: make this dynamic for example with cmdline parameters (only needed for randomness beacon, remove if changed to other randomness beacon)
+	globalNodeCount = 3
 )
 
 type ProviderIt interface {
@@ -630,8 +632,8 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 // choose random funnel
 func (p *Server) establishConnectionToRandomFunnel() {
 	// get current funnels
-	list := helpers.GetCurrentFunnelNodes(5)
-	randNumber := mrand.Int31n(1) // 1=funnelCount-1
+	list := helpers.GetCurrentFunnelNodes(globalNodeCount)
+	randNumber := mrand.Int31n(int32(len(list) - 1)) // 1=funnelCount-1
 	funnelId := list[randNumber]
 	// check if there already exists a connection to that funnel
 	_, pres := p.connections[strconv.Itoa(funnelId)]
@@ -696,7 +698,7 @@ func (p *Server) rearrangeReceivedPackets() [][]byte {
 
 func (p *Server) setCurrentRole() {
 	// get current funnels and compare with own id and set server flag
-	listOfFunnels := helpers.GetCurrentFunnelNodes(2)
+	listOfFunnels := helpers.GetCurrentFunnelNodes(globalNodeCount)
 	// isMapper false --> compute, reset flag
 	isMapper = false
 	for _, funnelId := range listOfFunnels {
