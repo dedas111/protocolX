@@ -340,7 +340,12 @@ func createTlsConnection(port int, t *testing.T) net.Conn {
 		return nil
 	}
 	config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
-	conn, err := tls.Dial("tcp", "127.0.0.1:"+strconv.Itoa(port), &config)
+	//conn, err := tls.Dial("tcp", "127.0.0.1:"+strconv.Itoa(port), &config)
+	ip, err := helpers.GetLocalIP()
+	if err != nil {
+		panic(err)
+	}
+	conn, err := tls.Dial("tcp", ip+":"+strconv.Itoa(port), &config)
 	if conn == nil {
 		t.Log("Conn is nil")
 		// retunr nil
@@ -531,12 +536,12 @@ func TestServer_CheckMultipleFunnels(t *testing.T) {
 }
 
 func TestServer_EndToEnd(t *testing.T) {
-	threadsCount = 2
+	threadsCount = 1
 	var connections = make([]net.Conn, threadsCount)
 
 	for i := 0; i < threadsCount; i++ {
 		t.Log("After the server starts")
-		port := 9900 + i // compute node acts as provider (takes client messages)
+		port := 9901 + i // compute node acts as provider (takes client messages)
 		connections[i] = createTlsConnection(port, t)
 		if connections[i] == nil {
 			t.Log("Conn is nil")
@@ -550,7 +555,7 @@ func TestServer_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	totalPackets := 3
+	totalPackets := 1
 	t.Log("Timestamp before the testrun starts : ", time.Now())
 
 	var waitgroup sync.WaitGroup
@@ -650,7 +655,7 @@ func createTestPacketForDynamicFunnels(t *testing.T, payload string) *sphinx.Sph
 	}
 	// get a random compute node
 	randId := mrand.Int31n(int32(len(nodeIds) - 1))
-	row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", randId, "provider")
+	row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", randId, "Provider")
 
 	var results []byte
 	err = row.Scan(&results)
@@ -677,7 +682,7 @@ func createStaticTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
 	}
 
 	// create configs for compute node
-	row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "1", "provider")
+	row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "1", "Provider")
 
 	var results []byte
 	err = row.Scan(&results)
@@ -688,10 +693,14 @@ func createStaticTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
 	err = proto.Unmarshal(results, &computeConfig)
 
 	// create ClientConfig for recipient
-	clientConfig := config.ClientConfig{Id: "1", Host: "localhost", Port: "50000", Provider: &localServer.config}
+	ip, err := helpers.GetLocalIP()
+	if err != nil {
+		panic(err)
+	}
+	clientConfig := config.ClientConfig{Id: "1", Host: ip, Port: "50000", Provider: &localServer.config}
 
 	// create packet
-	path := config.E2EPath{IngressProvider: localServer.config, Mixes: []config.MixConfig{computeConfig}, EgressProvider: localServer.config, Recipient: clientConfig}
+	path := config.E2EPath{IngressProvider: computeConfig, Mixes: []config.MixConfig{computeConfig}, EgressProvider: computeConfig, Recipient: clientConfig}
 	sphinxPacket, err := sphinx.PackForwardMessage(curve, path, []float64{0.1, 0.2, 0.3}, payload)
 	if err != nil {
 		t.Fatal(err)

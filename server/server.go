@@ -90,7 +90,7 @@ type Server struct {
 	runningIndex    []int
 
 	// TODO make dynamic with map id/connection
-	connections map[string]*tls.Conn // TLS connection to funnels
+	connections map[int]*tls.Conn // TLS connection to funnels
 }
 
 type ClientRecord struct {
@@ -138,6 +138,7 @@ func (p *Server) run() {
 		for {
 			select {
 			case <-d.C:
+				time.Sleep(200)
 				p.sendOutboundFunnelMessages()
 				// TODO: remove if after performance testing
 				if !(staticServerRole == "funnel" || staticServerRole == "compute") {
@@ -179,6 +180,7 @@ func (p *Server) run() {
 // forwarded or stored. If the processing was unsuccessful and error is returned.
 func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 	if isMapper { //funnel functionality
+		logLocal.Info("funnel functionality")
 		// p.aPac[index] = packet
 		p.receivedPackets[someIndex][p.runningIndex[someIndex]] = packet
 		p.runningIndex[someIndex]++
@@ -189,14 +191,22 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 			p.runningIndex[someIndex] = 0
 		}
 	} else { //compute node functionality
+		logLocal.Info("compute functionality")
+		logLocal.Info("Establishing connection to random funnel...")
+		funnelId := p.establishConnectionToRandomFunnel()
+		logLocal.Info("Done establishing connection to random funnel.")
+
 		newPacket, err := p.ProcessPacketInSameThread(packet)
 		if err != nil {
 			return err
 		}
+		logLocal.Info("NewPacket - ID: ", newPacket.Adr.Id)
+		logLocal.Info("NewPacket - Adress: ", newPacket.Adr.Address)
+
+		logLocal.Info("Connection to funnels: ", p.connections)
+		// forward to random active funnel node
 		if newPacket.Flag == "\xF1" {
-			p.forwardPacket(newPacket.Data, newPacket.Adr.Address)
-			// packetsRelayed = packetsRelayed +1
-			// logLocal.Info("MixServer: Total number of packets relayed", packetsRelayed)
+			p.forwardPacketToFunnel(newPacket.Data, funnelId)
 		} else {
 			logLocal.Info("Server: Packet has non-forward flag. Packet dropped")
 		}
@@ -266,6 +276,24 @@ func (p *Server) forwardPacket(sphinxPacket []byte, address string) error {
 		return err
 	}
 	// logLocal.Info("Server: Forwarded sphinx packet")
+	return nil
+}
+
+func (p *Server) forwardPacketToFunnel(sphinxPacket []byte, funnelId int) error {
+	packetBytes, err := config.WrapWithFlag(commFlag, sphinxPacket)
+	if err != nil {
+		return err
+	}
+
+	logLocal.Info("flag sent: ", commFlag)
+	logLocal.Info("Sphinx bytes sent: ", sphinxPacket)
+	logLocal.Info("General bytes sent: ", packetBytes)
+
+	p.connections[funnelId].Write(packetBytes)
+	if err != nil {
+		return err
+	}
+	logLocal.Info("Server: Forwarded sphinx packet to funnel")
 	return nil
 }
 
@@ -341,11 +369,23 @@ func (p *Server) relayPacket() error {
 }
 
 func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
-	newPacket, err := p.ProcessPacketForRelayInFunnel(packetBytes)
+	// unmarshal into general packet
+	var generalPacket config.GeneralPacket
+	err := proto.Unmarshal(packetBytes, &generalPacket)
+	if err != nil {
+		logLocal.WithError(err)
+	}
+	logLocal.Info("generalPacketBytes: ", generalPacket)
+	logLocal.Info("Flags: ", generalPacket.Flag)
+	//logLocal.Info("sphinxPacketBytes: ", generalPacket.Data)
+
+	newPacket, err := p.ProcessPacketForRelayInFunnel(generalPacket.Data) // this is the actual SphinxPacket
 	if err != nil {
 		logLocal.Info("MixServer: Packet couldn't be preprocessed for relay from funnel. Packet dropped")
 		return
 	}
+	// TODO: change to TLS
+	logLocal.Info("Here we could fail!")
 	p.forwardPacket(newPacket.Data, newPacket.Adr.Address)
 }
 
@@ -359,18 +399,23 @@ func (p *Server) startTlsServer() error {
 	config := tls.Config{Certificates: []tls.Certificate{cert}}
 
 	// someIndex := 0
-	for someIndex := 0; someIndex < threadsCount; someIndex++ {
+	ip, err := helpers.GetLocalIP()
+	if err != nil {
+		panic(err)
+	}
+	for someIndex := 1; someIndex < threadsCount; someIndex++ {
 		config.Rand = rand.Reader
 		intPort, _ := strconv.Atoi(p.port)
 		port := intPort + someIndex
-		service := "127.0.0.1:" + strconv.Itoa(port)
+		//service := "127.0.0.1:" + strconv.Itoa(port)
+		service := ip + ":" + strconv.Itoa(port)
 		listener, err := tls.Listen("tcp", service, &config)
 		if err != nil {
 			// log.Fatalf("server: listen: %s", err)
 			logLocal.Info("server: listen: ", err)
 			return err
 		}
-		logLocal.Info("server: listening")
+		logLocal.Info("server: listening on port ", port)
 
 		go func(localIndex int) {
 			for {
@@ -389,6 +434,7 @@ func (p *Server) startTlsServer() error {
 						logLocal.Info(x509.MarshalPKIXPublicKey(v.PublicKey))
 					}
 				}
+				logLocal.Info("Before handleClient")
 				go p.handleClient(conn, localIndex)
 				// someIndex++
 			}
@@ -423,6 +469,7 @@ func (p *Server) handleClient(conn net.Conn, someIndex int) {
 		// 	logLocal.WithError(err).Error(err)
 		// 	// return err
 		// }
+		logLocal.Info("Before receivedPacketWithIndex")
 		p.receivedPacketWithIndex(buf[:n], someIndex)
 
 		// switch string(packet.Flag) {
@@ -607,6 +654,7 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 	server := Server{id: id, host: host, port: port, Mix: node, listener: nil}
 	server.config = config.MixConfig{Id: server.id, Host: server.host, Port: server.port, PubKey: server.GetPublicKey()}
 	server.assignedClients = make(map[string]ClientRecord)
+	server.connections = make(map[int]*tls.Conn)
 
 	configBytes, err := proto.Marshal(&server.config)
 	if err != nil {
@@ -641,7 +689,7 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 
 // Establish a new persistent connection to one of the available funnel nodes
 // choose random funnel
-func (p *Server) establishConnectionToRandomFunnel() {
+func (p *Server) establishConnectionToRandomFunnel() int {
 	// get current funnels
 	// TODO: re-enable after performance testing, DIRTY HACK!!
 	//list := helpers.GetCurrentFunnelNodes(globalNodeCount)
@@ -654,15 +702,16 @@ func (p *Server) establishConnectionToRandomFunnel() {
 	} else {
 		funnelId = 3
 	}
+	logLocal.Info("funnelId: ", funnelId)
 	// check if there already exists a connection to that funnel
-	_, pres := p.connections[strconv.Itoa(funnelId)]
+	_, pres := p.connections[funnelId]
 	if !pres {
 		// check database for nodes which act as funnels
 		db, err := pki.OpenDatabase(PKI_DIR, "sqlite3")
 		if err != nil {
 			panic(err)
 		}
-		row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "Provider"+strconv.Itoa(funnelId), "provider")
+		row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", strconv.Itoa(funnelId), "Provider")
 
 		var results []byte
 		err = row.Scan(&results)
@@ -674,23 +723,29 @@ func (p *Server) establishConnectionToRandomFunnel() {
 		err = proto.Unmarshal(results, &mixConfig)
 
 		nodeHost := mixConfig.Host
-		nodePort := mixConfig.Port
+		intPort, _ := strconv.Atoi(mixConfig.Port)
+		nodePort := strconv.Itoa(intPort + 1)
 
 		// establish a connection with them
-		cert, err := tls.LoadX509KeyPair("certs/client.pem", "certs/client.key")
+		cert, err := tls.LoadX509KeyPair("/home/olaf/certs/client.pem", "/home/olaf/certs/client.key")
 		if err != nil {
 			logLocal.Info("compute node: loadkeys: ", err)
 		}
-		config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+		config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true, MinVersion: 2}
+		logLocal.Info("compute node: before dial")
+		logLocal.Info("compute node: nodeHost: ", nodeHost)
+		logLocal.Info("compute node: nodePort: ", nodePort)
 		conn, err := tls.Dial("tcp", nodeHost+":"+nodePort, &config)
+		logLocal.Info("compute node: after dial")
 		if err != nil {
 			logLocal.Info("compute node: dial: ", err)
 		}
 		logLocal.Info("compute node: connected to: ", conn.RemoteAddr())
 		// state := conn.ConnectionState() Debug Info about connection
 		// add connection to map if
-		p.connections[strconv.Itoa(funnelId)] = conn
+		p.connections[funnelId] = conn
 	}
+	return funnelId
 }
 
 // rearrangeReceivedPackets transfers all packets from the 3D array receivedPackets to a new outbound array and shuffles them
@@ -730,11 +785,12 @@ func (p *Server) setCurrentRole() {
 }
 
 func (p *Server) sendOutboundFunnelMessages() {
-	if len(p.receivedPackets) > 0 {
+	// reduce dimension of outbound packet array
+	outboundPackets := p.rearrangeReceivedPackets()
+	//logLocal.Info("Outbound packets: ", len(outboundPackets))
+	if len(outboundPackets) > 0 {
 		// relay packets here if funnel
 		if isMapper {
-			// reduce dimension of outbound packet array
-			outboundPackets := p.rearrangeReceivedPackets()
 			for _, packet := range outboundPackets {
 				p.relayPacketAsFunnel(packet)
 			}

@@ -483,3 +483,47 @@ func TestProcessSphinxPacketWithoutCrypto(t *testing.T) {
 	assert.Equal(t, "DestinationAddress", hop.Address)
 	assert.Equal(t, packetBytes, samePacket)
 }
+
+func TestProcessSphinxPacketInsideGeneralPacketWithoutCrypto(t *testing.T) {
+	c := Commands{Delay: 0.1}
+	message := "Plaintext message"
+
+	routing := RoutingInfo{NextHop: &Hop{"DestinationId", "DestinationAddress", []byte{}}, RoutingCommands: &c,
+		NextHopMetaData: []byte{}, Mac: []byte{}}
+
+	routingBytes, err := proto.Marshal(&routing)
+	if err != nil {
+		t.Error(err)
+	}
+
+	var packet SphinxPacket
+	packet.Hdr = &Header{[]byte{}, routingBytes, []byte{}}
+	packet.Pld = []byte(message)
+
+	packetBytes, _ := proto.Marshal(&packet)
+
+	genPacket := config.GeneralPacket{Data: packetBytes, Flag: []byte{0xc6}}
+	genPacketBytes, err := proto.Marshal(&genPacket)
+	if err != nil {
+		assert.Fail(t, "Error while marshalling GeneralPacket")
+		return
+	}
+
+	var newGenPacket config.GeneralPacket
+	err = proto.Unmarshal(genPacketBytes, &newGenPacket)
+	if err != nil {
+		assert.Fail(t, "Error while unmarshalling GeneralPacket")
+		return
+	}
+
+	assert.Equal(t, []byte{0xc6}, newGenPacket.Flag)
+
+	hop, _, samePacket, err := ProcessSphinxPacketWithoutCrypto(newGenPacket.Data)
+	if err != nil {
+		t.Error(err)
+	}
+
+	assert.Equal(t, "DestinationId", hop.Id)
+	assert.Equal(t, "DestinationAddress", hop.Address)
+	assert.Equal(t, packetBytes, samePacket)
+}

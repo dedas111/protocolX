@@ -24,7 +24,8 @@ go run main.go -typ=provider -id="2" -host=localhost -port=9910 -staticRole=funn
 sleep 1
 go run main.go -typ=provider -id="3" -host=localhost -port=9920 -staticRole=funnel >> logs/funnel2.log &
 sleep 1
-# read -p "Press CTRL-C to stop."
+
+# nc -l 50000 &
 
 # In case the loop is not working, we can use the following command
 #go run main.go -typ=mix -id=Mix1 -host=localhost -port=9998 > logs/bash.log &

@@ -17,6 +17,7 @@ package main
 import (
 	"github.com/dedas111/protocolX/client"
 	"github.com/dedas111/protocolX/config"
+	"github.com/dedas111/protocolX/helpers"
 	"github.com/dedas111/protocolX/logging"
 	"github.com/dedas111/protocolX/pki"
 	"github.com/dedas111/protocolX/server"
@@ -25,8 +26,6 @@ import (
 	"flag"
 	"fmt"
 	"runtime"
-
-	"github.com/dedas111/protocolX/helpers"
 
 	"github.com/golang/protobuf/proto"
 )
@@ -204,6 +203,7 @@ func main() {
 			panic(err)
 		}
 
+		///logLocal.Info("Saving IP to database: ", *host)
 		providerServer, err := server.NewServer(*id, *host, *port, pubP, privP, PKI_DIR, *staticRole)
 		if err != nil {
 			panic(err)
