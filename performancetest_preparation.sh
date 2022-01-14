@@ -17,12 +17,12 @@ fi
 NUMMIXES=3
 
 # launch 1 compute node
-go run main.go -typ=provider -id="1" -host=localhost -port=9900 -staticRole=compute >> logs/compute.log &
+go run main.go -typ=provider -id="1" -port=9900 -staticRole=compute >> logs/compute.log &
 sleep 1
 # launch 2 funnel nodes
-go run main.go -typ=provider -id="2" -host=localhost -port=9910 -staticRole=funnel >> logs/funnel1.log &
+go run main.go -typ=provider -id="2" -port=9910 -staticRole=funnel >> logs/funnel1.log &
 sleep 1
-go run main.go -typ=provider -id="3" -host=localhost -port=9920 -staticRole=funnel >> logs/funnel2.log &
+go run main.go -typ=provider -id="3" -port=9920 -staticRole=funnel >> logs/funnel2.log &
 sleep 1
 
 # nc -l 50000 &
