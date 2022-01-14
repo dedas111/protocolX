@@ -15,6 +15,7 @@
 package server
 
 import (
+	"crypto/rand"
 	"github.com/dedas111/protocolX/config"
 	helpers "github.com/dedas111/protocolX/helpers"
 	"github.com/dedas111/protocolX/node"
@@ -536,12 +537,14 @@ func TestServer_CheckMultipleFunnels(t *testing.T) {
 }
 
 func TestServer_EndToEnd(t *testing.T) {
+	go createTestTLSListener(t)
+
 	threadsCount = 1
 	var connections = make([]net.Conn, threadsCount)
 
 	for i := 0; i < threadsCount; i++ {
 		t.Log("After the server starts")
-		port := 9901 + i // compute node acts as provider (takes client messages)
+		port := 9900 + i // compute node acts as provider (takes client messages)
 		connections[i] = createTlsConnection(port, t)
 		if connections[i] == nil {
 			t.Log("Conn is nil")
@@ -555,9 +558,10 @@ func TestServer_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	totalPackets := 1
-	t.Log("Timestamp before the testrun starts : ", time.Now())
+	totalPackets := 60
+	t.Log("Timestamp before sending starts : ", time.Now())
 
+	//countPackets := 0
 	var waitgroup sync.WaitGroup
 	for j := 0; j < threadsCount; j++ {
 		waitgroup.Add(1)
@@ -565,15 +569,76 @@ func TestServer_EndToEnd(t *testing.T) {
 		go func(connection net.Conn) {
 			defer waitgroup.Done()
 			for i := 0; i < totalPackets; i++ {
+				//for countPackets < totalPackets {
 				_, err := connection.Write(bSphinxPacket)
 				if err != nil {
 					t.Log("There is an error : ", err)
 				}
+				//countPackets++
+				//t.Log(countPackets)
 			}
 		}(conn)
 	}
 	waitgroup.Wait()
-	t.Log("Timestamp after the testrun ends : ", time.Now())
+	t.Log("Timestamp after the packets have all been sent: ", time.Now())
+	time.Sleep(9000000000)
+}
+
+func createTestTLSListener(t *testing.T) error {
+	receivedPackets := 0
+	cert, err := tls.LoadX509KeyPair("/home/olaf/certs/server.pem", "/home/olaf/certs/server.key")
+	if err != nil {
+		t.Error("test: loadkeys error: ", err)
+		panic(err)
+	}
+	config := tls.Config{Certificates: []tls.Certificate{cert}}
+	config.Rand = rand.Reader
+
+	ip, err := helpers.GetLocalIP()
+	listener, err := tls.Listen("tcp", ip+":"+"50000", &config)
+	if err != nil {
+		t.Error("test: listen error: ", err)
+		panic(err)
+	}
+	t.Log("test: listening on port 50000")
+
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				t.Error("test: accept error: ", err)
+				break
+			}
+			//t.Log("test: accepted from ", conn.RemoteAddr())
+			tlscon, ok := conn.(*tls.Conn)
+			if ok {
+				state := tlscon.ConnectionState()
+				for _, v := range state.PeerCertificates {
+					logLocal.Info(x509.MarshalPKIXPublicKey(v.PublicKey))
+				}
+
+			}
+			buf := make([]byte, 1024)
+			n, err := conn.Read(buf)
+			if err != nil {
+				t.Error("test: conn: read error: ", err)
+				break
+			}
+			var answer sphinx.SphinxPacket
+			proto.Unmarshal(buf[:n], &answer)
+			if err != nil {
+				t.Error("test: unmarshalling error: ", err)
+				break
+			}
+			//t.Log("Packet received: ", answer)
+			receivedPackets++
+			if receivedPackets == 60 {
+				t.Log("Done at: ", time.Now())
+			}
+			t.Log("Received packets: ", receivedPackets)
+		}
+	}()
+	return err
 }
 
 // PrintMemUsage outputs the current, total and OS memory being used. As well as the number
@@ -681,7 +746,7 @@ func createStaticTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
 		panic(err)
 	}
 
-	// create configs for compute node
+	// create config for compute node
 	row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "1", "Provider")
 
 	var results []byte
@@ -700,8 +765,8 @@ func createStaticTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
 	clientConfig := config.ClientConfig{Id: "1", Host: ip, Port: "50000", Provider: &localServer.config}
 
 	// create packet
-	path := config.E2EPath{IngressProvider: computeConfig, Mixes: []config.MixConfig{computeConfig}, EgressProvider: computeConfig, Recipient: clientConfig}
-	sphinxPacket, err := sphinx.PackForwardMessage(curve, path, []float64{0.1, 0.2, 0.3}, payload)
+	path := config.E2EPath{IngressProvider: computeConfig, Mixes: []config.MixConfig{computeConfig, computeConfig}, EgressProvider: computeConfig, Recipient: clientConfig}
+	sphinxPacket, err := sphinx.PackForwardMessage(curve, path, []float64{0.1, 0.2, 0.3, 0.1, 0.2, 0.1}, payload)
 	if err != nil {
 		t.Fatal(err)
 		return nil

@@ -383,14 +383,13 @@ func ProcessSphinxPacket(packetBytes []byte, privKey []byte) (Hop, Commands, []b
 // ProcessSphinxPacketWithoutCrypto is used to retrieve routing information for a packet which has to be relayed by the funnel
 // No cryptographic unwrapping is done because funnel nodes just gather and relay messages.
 func ProcessSphinxPacketWithoutCrypto(packetBytes []byte) (Hop, Commands, []byte, error) {
-	logLocal.Info("Packet byte before unmarshalling: ", packetBytes)
 	var packet SphinxPacket
 	err := proto.Unmarshal(packetBytes, &packet)
 	if err != nil {
 		logLocal.WithError(err).Error("Error in ProcessSphinxPacketWithoutCrypto - unmarshal of packet failed")
-		//logLocal.Error("Packet bytes: ", packetBytes)
 		return Hop{}, Commands{}, nil, err
 	}
+	logLocal.Info("Unmarshalling of SphinxBytes successful")
 	var routingInfo RoutingInfo
 	err = proto.Unmarshal(packet.GetHdr().Beta, &routingInfo) // here there might be some fixing needed because beta might not be correct
 	if err != nil {

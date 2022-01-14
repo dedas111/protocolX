@@ -125,7 +125,7 @@ func (p *Server) GetConfig() config.MixConfig {
 
 // Function opens the listener to start listening on provider's host and port
 func (p *Server) run() {
-	defer p.listener.Close()
+	//defer p.listener.Close()
 	finish := make(chan bool)
 
 	// wait to synchronize with other servers on round start
@@ -192,24 +192,24 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 		}
 	} else { //compute node functionality
 		logLocal.Info("compute functionality")
-		logLocal.Info("Establishing connection to random funnel...")
 		funnelId := p.establishConnectionToRandomFunnel()
-		logLocal.Info("Done establishing connection to random funnel.")
 
 		newPacket, err := p.ProcessPacketInSameThread(packet)
 		if err != nil {
 			return err
 		}
-		logLocal.Info("NewPacket - ID: ", newPacket.Adr.Id)
 		logLocal.Info("NewPacket - Adress: ", newPacket.Adr.Address)
 
-		logLocal.Info("Connection to funnels: ", p.connections)
+		computePacket := config.ComputePacket{Data: newPacket.Data, NextHop: newPacket.Adr.Address}
 		// forward to random active funnel node
-		if newPacket.Flag == "\xF1" {
-			p.forwardPacketToFunnel(newPacket.Data, funnelId)
-		} else {
-			logLocal.Info("Server: Packet has non-forward flag. Packet dropped")
-		}
+		//if newPacket.Flag == "\xF1" {
+		p.forwardPacketToFunnel(computePacket, funnelId)
+		relayedPackets++
+		//} else {
+		//	logLocal.Info("Server: Packet has non-forward flag. Packet dropped")
+		//}
+		logLocal.Info("Relayed packets: ", relayedPackets)
+		logLocal.Info("-------------------------------------------------------------")
 	}
 
 	// cPac := make(chan node.MixPacket)
@@ -279,15 +279,39 @@ func (p *Server) forwardPacket(sphinxPacket []byte, address string) error {
 	return nil
 }
 
-func (p *Server) forwardPacketToFunnel(sphinxPacket []byte, funnelId int) error {
-	packetBytes, err := config.WrapWithFlag(commFlag, sphinxPacket)
+func (p *Server) forwardPacketTLS(sphinxPacket []byte, address string) error {
+	//packetBytes, err := config.WrapWithFlag(commFlag, sphinxPacket)
+	//if err != nil {
+	//	return err
+	///}
+
+	cert, err := tls.LoadX509KeyPair("/home/olaf/certs/client.pem", "/home/olaf/certs/client.key")
+	if err != nil {
+		logLocal.Info("compute node: loadkeys: ", err)
+	}
+	config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true, MinVersion: 2}
+	conn, err := tls.Dial("tcp", address, &config)
+	if err != nil {
+		logLocal.Error("Couldn't create TLS connection with peer.", address)
+		logLocal.Error(err)
+		return err
+	}
+	conn.Write(sphinxPacket)
 	if err != nil {
 		return err
 	}
+	return nil
+}
 
-	logLocal.Info("flag sent: ", commFlag)
-	logLocal.Info("Sphinx bytes sent: ", sphinxPacket)
-	logLocal.Info("General bytes sent: ", packetBytes)
+func (p *Server) forwardPacketToFunnel(computePacket config.ComputePacket, funnelId int) error {
+	computeBytes, err := proto.Marshal(&computePacket)
+	if err != nil {
+		logLocal.WithError(err)
+	}
+	packetBytes, err := config.WrapWithFlag(commFlag, computeBytes)
+	if err != nil {
+		return err
+	}
 
 	p.connections[funnelId].Write(packetBytes)
 	if err != nil {
@@ -375,18 +399,14 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 	if err != nil {
 		logLocal.WithError(err)
 	}
-	logLocal.Info("generalPacketBytes: ", generalPacket)
-	logLocal.Info("Flags: ", generalPacket.Flag)
-	//logLocal.Info("sphinxPacketBytes: ", generalPacket.Data)
 
-	newPacket, err := p.ProcessPacketForRelayInFunnel(generalPacket.Data) // this is the actual SphinxPacket
+	var computePacket config.ComputePacket
+	err = proto.Unmarshal(generalPacket.Data, &computePacket)
 	if err != nil {
-		logLocal.Info("MixServer: Packet couldn't be preprocessed for relay from funnel. Packet dropped")
-		return
+		logLocal.WithError(err)
 	}
-	// TODO: change to TLS
-	logLocal.Info("Here we could fail!")
-	p.forwardPacket(newPacket.Data, newPacket.Adr.Address)
+	logLocal.Info("Next Hop: ", computePacket.NextHop)
+	p.forwardPacketTLS(computePacket.Data, computePacket.NextHop) // data in computePacket is a SphinxPacket
 }
 
 func (p *Server) startTlsServer() error {
@@ -403,7 +423,7 @@ func (p *Server) startTlsServer() error {
 	if err != nil {
 		panic(err)
 	}
-	for someIndex := 1; someIndex < threadsCount; someIndex++ {
+	for someIndex := 0; someIndex < threadsCount; someIndex++ {
 		config.Rand = rand.Reader
 		intPort, _ := strconv.Atoi(p.port)
 		port := intPort + someIndex
@@ -434,7 +454,6 @@ func (p *Server) startTlsServer() error {
 						logLocal.Info(x509.MarshalPKIXPublicKey(v.PublicKey))
 					}
 				}
-				logLocal.Info("Before handleClient")
 				go p.handleClient(conn, localIndex)
 				// someIndex++
 			}
@@ -469,7 +488,6 @@ func (p *Server) handleClient(conn net.Conn, someIndex int) {
 		// 	logLocal.WithError(err).Error(err)
 		// 	// return err
 		// }
-		logLocal.Info("Before receivedPacketWithIndex")
 		p.receivedPacketWithIndex(buf[:n], someIndex)
 
 		// switch string(packet.Flag) {
@@ -666,19 +684,23 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 	}
 
 	// addr, err := helpers.ResolveTCPAddress(server.host, server.port)
-	addr := server.host + ":" + server.port
-	if err != nil {
-		return nil, err
-	}
-	//server.listener, err = net.ListenTCP("tcp", addr)
-	cert, err := tls.LoadX509KeyPair("/home/olaf/certs/server.pem", "/home/olaf/certs/server.key")
-	if err != nil {
-		// log.Fatalf("server: loadkeys: %s", err)
-		logLocal.Info("server: loadkeys: ", err)
-		panic(err)
-	}
-	conf := tls.Config{Certificates: []tls.Certificate{cert}}
-	server.listener, err = tls.Listen("tcp", addr, &conf)
+	/*
+		addr := server.host + ":" + server.port
+		if err != nil {
+			return nil, err
+		}
+		//server.listener, err = net.ListenTCP("tcp", addr)
+		cert, err := tls.LoadX509KeyPair("/home/olaf/certs/server.pem", "/home/olaf/certs/server.key")
+		if err != nil {
+			// log.Fatalf("server: loadkeys: %s", err)
+			logLocal.Info("server: loadkeys: ", err)
+			panic(err)
+		}
+
+			conf := tls.Config{Certificates: []tls.Certificate{cert}}
+			conf.Rand = rand.Reader
+			server.listener, err = tls.Listen("tcp", addr, &conf)
+	*/
 
 	if err != nil {
 		return nil, err
@@ -724,7 +746,7 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 
 		nodeHost := mixConfig.Host
 		intPort, _ := strconv.Atoi(mixConfig.Port)
-		nodePort := strconv.Itoa(intPort + 1)
+		nodePort := strconv.Itoa(intPort)
 
 		// establish a connection with them
 		cert, err := tls.LoadX509KeyPair("/home/olaf/certs/client.pem", "/home/olaf/certs/client.key")
@@ -732,15 +754,12 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 			logLocal.Info("compute node: loadkeys: ", err)
 		}
 		config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true, MinVersion: 2}
-		logLocal.Info("compute node: before dial")
-		logLocal.Info("compute node: nodeHost: ", nodeHost)
-		logLocal.Info("compute node: nodePort: ", nodePort)
+
 		conn, err := tls.Dial("tcp", nodeHost+":"+nodePort, &config)
-		logLocal.Info("compute node: after dial")
 		if err != nil {
 			logLocal.Info("compute node: dial: ", err)
 		}
-		logLocal.Info("compute node: connected to: ", conn.RemoteAddr())
+		logLocal.Info("compute node: connected to funnel: ", conn.RemoteAddr())
 		// state := conn.ConnectionState() Debug Info about connection
 		// add connection to map if
 		p.connections[funnelId] = conn
@@ -793,7 +812,10 @@ func (p *Server) sendOutboundFunnelMessages() {
 		if isMapper {
 			for _, packet := range outboundPackets {
 				p.relayPacketAsFunnel(packet)
+				relayedPackets++
 			}
+			logLocal.Info("Sent all outbound packages as funnel.")
+			logLocal.Info("Relayed packets: ", relayedPackets)
 		}
 	}
 }

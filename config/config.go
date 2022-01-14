@@ -62,8 +62,8 @@ func (p *E2EPath) Len() int {
 var SyncTime = time.Unix(0, 0)
 
 const (
-	PathLength     = 0
-	RoundDuration  = 500 * time.Millisecond
+	PathLength     = 4
+	RoundDuration  = 1000 * time.Millisecond
 	ClientDuration = 1 * time.Millisecond
 )
 
