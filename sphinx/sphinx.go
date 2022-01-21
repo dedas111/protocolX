@@ -381,7 +381,7 @@ func ProcessSphinxPacket(packetBytes []byte, privKey []byte) (Hop, Commands, []b
 }
 
 // ProcessSphinxPacketWithoutCrypto is used to retrieve routing information for a packet which has to be relayed by the funnel
-// No cryptographic unwrapping is done because funnel nodes just gather and relay messages.
+// No cryptographic unwrapping is done because funnel nodes just collect and relay messages.
 func ProcessSphinxPacketWithoutCrypto(packetBytes []byte) (Hop, Commands, []byte, error) {
 	var packet SphinxPacket
 	err := proto.Unmarshal(packetBytes, &packet)

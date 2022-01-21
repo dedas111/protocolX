@@ -89,7 +89,6 @@ type Server struct {
 	mutex           sync.Mutex
 	runningIndex    []int
 
-	// TODO make dynamic with map id/connection
 	connections map[int]*tls.Conn // TLS connection to funnels
 }
 
@@ -279,6 +278,7 @@ func (p *Server) forwardPacket(sphinxPacket []byte, address string) error {
 	return nil
 }
 
+// forwardPacketTLS() opens a new TLS connection with the given address (IP/name + port) and sends the passed SphinxPacket
 func (p *Server) forwardPacketTLS(sphinxPacket []byte, address string) error {
 	//packetBytes, err := config.WrapWithFlag(commFlag, sphinxPacket)
 	//if err != nil {
@@ -409,6 +409,8 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 	p.forwardPacketTLS(computePacket.Data, computePacket.NextHop) // data in computePacket is a SphinxPacket
 }
 
+// startTlsServer() opens multiple TLS listeners on multiple ports starting with the port given during server start.
+// The amount pf listeners depends on thread count.
 func (p *Server) startTlsServer() error {
 	cert, err := tls.LoadX509KeyPair("/home/olaf/certs/server.pem", "/home/olaf/certs/server.key")
 	if err != nil {
@@ -683,34 +685,12 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 		return nil, err
 	}
 
-	// addr, err := helpers.ResolveTCPAddress(server.host, server.port)
-	/*
-		addr := server.host + ":" + server.port
-		if err != nil {
-			return nil, err
-		}
-		//server.listener, err = net.ListenTCP("tcp", addr)
-		cert, err := tls.LoadX509KeyPair("/home/olaf/certs/server.pem", "/home/olaf/certs/server.key")
-		if err != nil {
-			// log.Fatalf("server: loadkeys: %s", err)
-			logLocal.Info("server: loadkeys: ", err)
-			panic(err)
-		}
-
-			conf := tls.Config{Certificates: []tls.Certificate{cert}}
-			conf.Rand = rand.Reader
-			server.listener, err = tls.Listen("tcp", addr, &conf)
-	*/
-
-	if err != nil {
-		return nil, err
-	}
-
 	return &server, nil
 }
 
-// Establish a new persistent connection to one of the available funnel nodes
-// choose random funnel
+// establishConnectionToRandomFunnel() establishes a new persistent connection to one of the available funnel nodes.
+// The function chooses random funnel to connect to. If the connection to that node is already established, no new connection is created.
+// Returns the funnelId of the node it connected to.
 func (p *Server) establishConnectionToRandomFunnel() int {
 	// get current funnels
 	// TODO: re-enable after performance testing, DIRTY HACK!!
@@ -767,7 +747,7 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 	return funnelId
 }
 
-// rearrangeReceivedPackets transfers all packets from the 3D array receivedPackets to a new outbound array and shuffles them
+// rearrangeReceivedPackets transfers all packets from the 3D array receivedPackets to a new outbound array and shuffles them.
 func (p *Server) rearrangeReceivedPackets() [][]byte {
 	outboundPackets := make([][]byte, 0)
 	// iterate over the packages of each thread but just until the index marking new packages ends so nothing is sent multiple times
@@ -789,6 +769,7 @@ func (p *Server) rearrangeReceivedPackets() [][]byte {
 	return outboundPackets
 }
 
+// setCurrentRole() sets the nodewide status determining how the node behaves when accepting and relaying packets.
 func (p *Server) setCurrentRole() {
 	// get current funnels and compare with own id and set server flag
 	listOfFunnels := helpers.GetCurrentFunnelNodes(globalNodeCount)
@@ -803,6 +784,9 @@ func (p *Server) setCurrentRole() {
 	}
 }
 
+// sendOutboundFunnelMessages() is a funnel function.
+// It sends out collected packets to their next hop without removing a layer of crypto.
+// Before sending, the function checks if the node is actually a funnel node and if there are packets to send.
 func (p *Server) sendOutboundFunnelMessages() {
 	// reduce dimension of outbound packet array
 	outboundPackets := p.rearrangeReceivedPackets()

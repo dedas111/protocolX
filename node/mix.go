@@ -76,17 +76,6 @@ func (m *Mix) ProcessPacketInSameThread(packet []byte) (*MixPacket, error) {
 
 }
 
-func (m *Mix) ProcessPacketForRelayInFunnel(packet []byte) (*MixPacket, error) {
-	nextHop, commands, newPacket, err := sphinx.ProcessSphinxPacketWithoutCrypto(packet)
-	if err != nil {
-		// errCh <- err
-		return nil, err
-	}
-
-	mixPacket := MixPacket{newPacket, nextHop, string(commands.Flag)}
-	return &mixPacket, err
-}
-
 // GetPublicKey returns the public key of the mixnode.
 func (m *Mix) GetPublicKey() []byte {
 	return m.pubKey
