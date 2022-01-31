@@ -21,6 +21,9 @@ import (
 	"github.com/dedas111/protocolX/networker"
 	"github.com/dedas111/protocolX/node"
 	"github.com/dedas111/protocolX/pki"
+	"runtime"
+	"strings"
+
 	// "github.com/dedas111/protocolX/sphinx"
 	"github.com/dedas111/protocolX/logging"
 
@@ -54,8 +57,9 @@ var (
 	isMapper         = true
 	// runningIndex = 0
 	msgCount         = 100000
-	threadsCount     = 5
+	threadsCount     = 4
 	staticServerRole = ""
+	lbCtr            = 0
 
 	logLocal = logging.PackageLogger()
 )
@@ -405,8 +409,34 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 	if err != nil {
 		logLocal.WithError(err)
 	}
-	logLocal.Info("Next Hop: ", computePacket.NextHop)
-	p.forwardPacketTLS(computePacket.Data, computePacket.NextHop) // data in computePacket is a SphinxPacket
+	// experimental loadbalancing here - use different destination ports for relay
+	//logLocal.Info("Address to be processed: ", computePacket.NextHop)
+	if len(computePacket.NextHop) == 0 {
+		logLocal.Info("Empty next hop! Not relaying!")
+		logLocal.Error("Packet: ", computePacket)
+		return
+	}
+	dstIp := strings.SplitAfter(computePacket.NextHop, ":")[0]
+	dbPort := strings.SplitAfter(computePacket.NextHop, ":")[1]
+
+	dbPortInt, err := strconv.Atoi(dbPort)
+	if err != nil {
+		logLocal.Error("Couldn't read port from packet to relay!", err)
+	}
+
+	if dbPortInt < 10000 && dbPortInt >= 9900 { // hardcoded portrange for protocol for now
+		dstAddr := dstIp + strconv.Itoa(dbPortInt+lbCtr)
+		// for this to work, every server has to have the same amount of threads
+		lbCtr = (lbCtr + 1) % threadsCount
+
+		//logLocal.Info("Next Hop old: ", computePacket.NextHop)
+		//logLocal.Info("Next Hop new: ", dstAddr)
+		p.forwardPacketTLS(computePacket.Data, dstAddr) // data in computePacket is a SphinxPacket
+	} else {
+		//logLocal.Info("Next Hop: ", computePacket.NextHop)
+		p.forwardPacketTLS(computePacket.Data, computePacket.NextHop) // data in computePacket is a SphinxPacket
+	}
+
 }
 
 // startTlsServer() opens multiple TLS listeners on multiple ports starting with the port given during server start.
@@ -675,6 +705,9 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 	server.config = config.MixConfig{Id: server.id, Host: server.host, Port: server.port, PubKey: server.GetPublicKey()}
 	server.assignedClients = make(map[string]ClientRecord)
 	server.connections = make(map[int]*tls.Conn)
+
+	threadsCount = runtime.NumCPU()
+	//logLocal.Info("Starting server with logical cores: ", threadsCount)
 
 	configBytes, err := proto.Marshal(&server.config)
 	if err != nil {
