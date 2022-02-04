@@ -118,6 +118,25 @@ func AddToDatabase(pkiPath string, tableName, id, typ string, config []byte) err
 	return nil
 }
 
+// CheckDatabaseForServerId checks the given database for the existence of the id specified in parameter id
+func CheckDatabaseForServerId(pkiPath string, tableName string, id string) (bool, error) {
+	db, err := pki.OpenDatabase(pkiPath, "sqlite3")
+	if err != nil {
+		return false, err
+	}
+	defer db.Close()
+
+	row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", id, "Provider")
+
+	var results []byte
+	err = row.Scan(&results)
+	if err != nil {
+		//fmt.Println(err)
+		return false, err
+	}
+	return true, nil
+}
+
 func DirExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {

@@ -709,13 +709,21 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 	threadsCount = runtime.NumCPU()
 	//logLocal.Info("Starting server with logical cores: ", threadsCount)
 
-	configBytes, err := proto.Marshal(&server.config)
-	if err != nil {
-		return nil, err
-	}
-	err = helpers.AddToDatabase(pkiPath, "Pki", server.id, "Provider", configBytes)
-	if err != nil {
-		return nil, err
+	// prevent server from adding its config multiple times to database --- THIS JUST CHECKS THE ID NOT THE CONFIG AS OF RIGHT NOW
+	idExists, _ := helpers.CheckDatabaseForServerId(pkiPath, "Pki", server.id)
+	if !idExists {
+		logLocal.Info("ServerID doesn't exist in DB, inserting...")
+		configBytes, err := proto.Marshal(&server.config)
+		if err != nil {
+			return nil, err
+		}
+		err = helpers.AddToDatabase(pkiPath, "Pki", server.id, "Provider", configBytes)
+		if err != nil {
+			return nil, err
+		}
+		logLocal.Info("ServerID inserted to DB.")
+	} else {
+		logLocal.Info("Skipping insertion of ServerID to DB as it already exists.")
 	}
 
 	return &server, nil
