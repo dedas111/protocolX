@@ -558,7 +558,7 @@ func TestServer_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	totalPackets := 60
+	totalPackets := 1000
 	t.Log("Timestamp before sending starts : ", time.Now())
 
 	//countPackets := 0
@@ -581,7 +581,8 @@ func TestServer_EndToEnd(t *testing.T) {
 	}
 	waitgroup.Wait()
 	t.Log("Timestamp after the packets have all been sent: ", time.Now())
-	time.Sleep(9000000000)
+	// sleep timer to keep listener alive
+	time.Sleep(25000000000)
 }
 
 func createTestTLSListener(t *testing.T) error {
@@ -632,10 +633,10 @@ func createTestTLSListener(t *testing.T) error {
 			}
 			//t.Log("Packet received: ", answer)
 			receivedPackets++
-			if receivedPackets == 60 {
-				t.Log("Done at: ", time.Now())
+			if receivedPackets == 980 {
+				t.Log("Received 980 packets at: ", time.Now())
 			}
-			t.Log("Received packets: ", receivedPackets)
+			//t.Log("Received packets: ", receivedPackets)
 		}
 	}()
 	return err

@@ -93,7 +93,7 @@ type Server struct {
 	mutex           sync.Mutex
 	runningIndex    []int
 
-	connections map[int]*tls.Conn // TLS connection to funnels
+	connections map[int][]*tls.Conn // TLS connection to funnels
 }
 
 type ClientRecord struct {
@@ -317,11 +317,12 @@ func (p *Server) forwardPacketToFunnel(computePacket config.ComputePacket, funne
 		return err
 	}
 
-	p.connections[funnelId].Write(packetBytes)
+	randPort := mrand.Int31n(int32(threadsCount - 1))
+	p.connections[funnelId][randPort].Write(packetBytes)
 	if err != nil {
 		return err
 	}
-	logLocal.Info("Server: Forwarded sphinx packet to funnel")
+	logLocal.Info("Server: Forwarded sphinx packet to funnel with port: ", randPort)
 	return nil
 }
 
@@ -704,26 +705,25 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 	server := Server{id: id, host: host, port: port, Mix: node, listener: nil}
 	server.config = config.MixConfig{Id: server.id, Host: server.host, Port: server.port, PubKey: server.GetPublicKey()}
 	server.assignedClients = make(map[string]ClientRecord)
-	server.connections = make(map[int]*tls.Conn)
+	server.connections = make(map[int][]*tls.Conn)
 
 	threadsCount = runtime.NumCPU()
 	//logLocal.Info("Starting server with logical cores: ", threadsCount)
 
-	// prevent server from adding its config multiple times to database --- THIS JUST CHECKS THE ID NOT THE CONFIG AS OF RIGHT NOW
-	idExists, _ := helpers.CheckDatabaseForServerId(pkiPath, "Pki", server.id)
-	if !idExists {
-		logLocal.Info("ServerID doesn't exist in DB, inserting...")
-		configBytes, err := proto.Marshal(&server.config)
-		if err != nil {
-			return nil, err
-		}
-		err = helpers.AddToDatabase(pkiPath, "Pki", server.id, "Provider", configBytes)
-		if err != nil {
-			return nil, err
-		}
-		logLocal.Info("ServerID inserted to DB.")
-	} else {
-		logLocal.Info("Skipping insertion of ServerID to DB as it already exists.")
+	// prevent server from adding its config multiple times to database
+	logLocal.Info("Deleting old DB entry...")
+	err := helpers.RemoveDBEntryForServerId(pkiPath, "Pki", server.id)
+	if err != nil {
+		logLocal.Error("Error deleting old DB entry for node.", err)
+	}
+	logLocal.Info("Finished deleting old DB entry.")
+	configBytes, err := proto.Marshal(&server.config)
+	if err != nil {
+		return nil, err
+	}
+	err = helpers.AddToDatabase(pkiPath, "Pki", server.id, "Provider", configBytes)
+	if err != nil {
+		return nil, err
 	}
 
 	return &server, nil
@@ -739,12 +739,15 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 	//randNumber := mrand.Int31n(int32(len(list) - 1)) // 1=funnelCount-1
 	//funnelId := list[randNumber]
 
+	// --- THIS HAS TO BE REMOVED AFTERWARDS ---
 	funnelId := 0
 	if config.GetRound()%2 == 0 {
 		funnelId = 2
 	} else {
 		funnelId = 3
 	}
+	// --- THIS HAS TO BE REMOVED AFTERWARDS ---
+
 	logLocal.Info("funnelId: ", funnelId)
 	// check if there already exists a connection to that funnel
 	_, pres := p.connections[funnelId]
@@ -765,25 +768,31 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 		var mixConfig config.MixConfig
 		err = proto.Unmarshal(results, &mixConfig)
 
-		nodeHost := mixConfig.Host
-		intPort, _ := strconv.Atoi(mixConfig.Port)
-		nodePort := strconv.Itoa(intPort)
-
-		// establish a connection with them
+		// establish a connection with them using all available ports stated by threadsCount
 		cert, err := tls.LoadX509KeyPair("/home/olaf/certs/client.pem", "/home/olaf/certs/client.key")
 		if err != nil {
 			logLocal.Info("compute node: loadkeys: ", err)
 		}
 		config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true, MinVersion: 2}
 
-		conn, err := tls.Dial("tcp", nodeHost+":"+nodePort, &config)
-		if err != nil {
-			logLocal.Info("compute node: dial: ", err)
+		nodeHost := mixConfig.Host
+		intPort, _ := strconv.Atoi(mixConfig.Port)
+		p.connections[funnelId] = make([]*tls.Conn, threadsCount)
+
+		// open connection with every available port for multithreading the ingress of funnel nodes
+		i := 0
+		for i < threadsCount {
+			realPort := intPort + i
+			nodePort := strconv.Itoa(realPort)
+			conn, err := tls.Dial("tcp", nodeHost+":"+nodePort, &config)
+			if err != nil {
+				logLocal.Info("compute node: dial: ", err)
+			}
+			p.connections[funnelId][i] = conn
+			logLocal.Info("compute node: connected to funnel: ", conn.RemoteAddr())
+			i = i + 1
 		}
-		logLocal.Info("compute node: connected to funnel: ", conn.RemoteAddr())
 		// state := conn.ConnectionState() Debug Info about connection
-		// add connection to map if
-		p.connections[funnelId] = conn
 	}
 	return funnelId
 }

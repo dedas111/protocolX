@@ -118,23 +118,19 @@ func AddToDatabase(pkiPath string, tableName, id, typ string, config []byte) err
 	return nil
 }
 
-// CheckDatabaseForServerId checks the given database for the existence of the id specified in parameter id
-func CheckDatabaseForServerId(pkiPath string, tableName string, id string) (bool, error) {
+// RemoveDBEntryForServerId deletes the DB entry with the corresponding id
+func RemoveDBEntryForServerId(pkiPath string, tableName string, id string) error {
 	db, err := pki.OpenDatabase(pkiPath, "sqlite3")
 	if err != nil {
-		return false, err
+		return err
 	}
 	defer db.Close()
 
-	row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", id, "Provider")
-
-	var results []byte
-	err = row.Scan(&results)
+	db.Exec("DELETE FROM Pki WHERE Id = ? AND Typ = ?", id, "Provider")
 	if err != nil {
-		//fmt.Println(err)
-		return false, err
+		return err
 	}
-	return true, nil
+	return nil
 }
 
 func DirExists(path string) (bool, error) {
