@@ -183,7 +183,7 @@ func (p *Server) run() {
 // forwarded or stored. If the processing was unsuccessful and error is returned.
 func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 	if isMapper { //funnel functionality
-		logLocal.Info("funnel functionality")
+		//logLocal.Info("funnel functionality")
 		// p.aPac[index] = packet
 		p.receivedPackets[someIndex][p.runningIndex[someIndex]] = packet
 		p.runningIndex[someIndex]++
@@ -746,6 +746,11 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 	} else {
 		funnelId = 3
 	}
+	// --- THIS HAS TO BE REMOVED AFTERWARDS ---
+
+	// use this for testing with only one funnel
+	// funndelId := 2
+
 	// --- THIS HAS TO BE REMOVED AFTERWARDS ---
 
 	logLocal.Info("funnelId: ", funnelId)

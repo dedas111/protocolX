@@ -636,7 +636,7 @@ func createTestTLSListener(t *testing.T) error {
 			if receivedPackets == 980 {
 				t.Log("Received 980 packets at: ", time.Now())
 			}
-			//t.Log("Received packets: ", receivedPackets)
+			t.Log("Received packets: ", receivedPackets)
 		}
 	}()
 	return err
