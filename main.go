@@ -210,8 +210,9 @@ func main() {
 				panic(err)
 			}
 			logLocal.Info("Generation of new keys successfull.")
+		} else {
+			logLocal.Info("Local serverkeys loaded!")
 		}
-		logLocal.Info("Local serverkeys loaded!")
 
 		///logLocal.Info("Saving IP to database: ", *host)
 		providerServer, err := server.NewServer(*id, *host, *port, pubP, privP, PKI_DIR, *staticRole)
