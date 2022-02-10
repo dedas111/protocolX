@@ -93,7 +93,8 @@ type Server struct {
 	mutex           sync.Mutex
 	runningIndex    []int
 
-	connections map[int][]*tls.Conn // TLS connection to funnels
+	connections          map[int][]*tls.Conn  // TLS connection to funnels
+	connectionsToCompute map[string]*tls.Conn // TLS connection to funnels
 }
 
 type ClientRecord struct {
@@ -322,7 +323,7 @@ func (p *Server) forwardPacketToFunnel(computePacket config.ComputePacket, funne
 	if err != nil {
 		return err
 	}
-	logLocal.Info("Server: Forwarded sphinx packet to funnel with port: ", randPort)
+	logLocal.Info("Server: Forwarded sphinx packet to funnel with id and port: ", funnelId, randPort)
 	return nil
 }
 
@@ -430,9 +431,34 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 		// for this to work, every server has to have the same amount of threads
 		lbCtr = (lbCtr + 1) % threadsCount
 
+		// save connection to map if it doesn't exist
+		conn, pres := p.connectionsToCompute[dstAddr]
+
+		if !pres {
+			cert, err := tls.LoadX509KeyPair("/home/olaf/certs/client.pem", "/home/olaf/certs/client.key")
+			if err != nil {
+				logLocal.Info("compute node: loadkeys: ", err)
+			}
+			config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true, MinVersion: 2}
+			conn, err := tls.Dial("tcp", dstAddr, &config)
+			if err != nil {
+				logLocal.Error("Couldn't create TLS connection with peer.", dstAddr)
+				logLocal.Error(err)
+			}
+			p.connectionsToCompute[dstAddr] = conn
+			conn.Write(computePacket.Data)
+			if err != nil {
+				logLocal.Error("Error sending packet to compute.", err)
+			}
+		} else {
+			_, err := conn.Write(computePacket.Data)
+			if err != nil {
+				logLocal.Error("Error sending packet to compute.", err)
+			}
+		}
 		//logLocal.Info("Next Hop old: ", computePacket.NextHop)
 		//logLocal.Info("Next Hop new: ", dstAddr)
-		p.forwardPacketTLS(computePacket.Data, dstAddr) // data in computePacket is a SphinxPacket
+		//p.forwardPacketTLS(computePacket.Data, dstAddr) // data in computePacket is a SphinxPacket
 	} else {
 		//logLocal.Info("Next Hop: ", computePacket.NextHop)
 		p.forwardPacketTLS(computePacket.Data, computePacket.NextHop) // data in computePacket is a SphinxPacket
@@ -490,7 +516,7 @@ func (p *Server) startTlsServer() error {
 				go p.handleClient(conn, localIndex)
 				// someIndex++
 			}
-		}(someIndex)
+		}(someIndex) // someIndex as input for localIndex
 	}
 	return nil
 }
@@ -706,6 +732,7 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 	server.config = config.MixConfig{Id: server.id, Host: server.host, Port: server.port, PubKey: server.GetPublicKey()}
 	server.assignedClients = make(map[string]ClientRecord)
 	server.connections = make(map[int][]*tls.Conn)
+	server.connectionsToCompute = make(map[string]*tls.Conn)
 
 	threadsCount = runtime.NumCPU()
 	//logLocal.Info("Starting server with logical cores: ", threadsCount)
