@@ -15,6 +15,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"github.com/dedas111/protocolX/client"
 	"github.com/dedas111/protocolX/config"
 	"github.com/dedas111/protocolX/helpers"
@@ -22,9 +24,7 @@ import (
 	"github.com/dedas111/protocolX/pki"
 	"github.com/dedas111/protocolX/server"
 	"github.com/dedas111/protocolX/sphinx"
-
-	"flag"
-	"fmt"
+	"os"
 	"runtime"
 
 	"github.com/golang/protobuf/proto"
@@ -198,10 +198,20 @@ func main() {
 		threads := runtime.GOMAXPROCS(0) - 2
 		logLocal.Info("main: case provider: the total number of threads used : ", threads)
 
-		pubP, privP, err := sphinx.GenerateKeyPair()
+		//os.WriteFile("/home/olaf/GolandProjects/pubP", pubP, 0644)
+		logLocal.Info("Trying to use local serverkeys...")
+		pubP, err := os.ReadFile("/home/olaf/GolandProjects/protocolX/pki/pubP")
+		privP, err := os.ReadFile("/home/olaf/GolandProjects/protocolX/pki/privP")
+
 		if err != nil {
-			panic(err)
+			logLocal.Info("Reading serverkeys from file failed, generating new keys.")
+			pubP, privP, err = sphinx.GenerateKeyPair()
+			if err != nil {
+				panic(err)
+			}
+			logLocal.Info("Generation of new keys successfull.")
 		}
+		logLocal.Info("Local serverkeys loaded!")
 
 		///logLocal.Info("Saving IP to database: ", *host)
 		providerServer, err := server.NewServer(*id, *host, *port, pubP, privP, PKI_DIR, *staticRole)
