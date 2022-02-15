@@ -134,7 +134,9 @@ func main() {
 		panic(err)
 	}
 
-	host = &ip
+	if len(*host) == 0 {
+		host = &ip
+	}
 
 	switch *typ {
 	case "client":

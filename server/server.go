@@ -767,16 +767,19 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 	//funnelId := list[randNumber]
 
 	// --- THIS HAS TO BE REMOVED AFTERWARDS ---
-	funnelId := 0
-	if config.GetRound()%2 == 0 {
-		funnelId = 2
-	} else {
-		funnelId = 3
-	}
+	/*
+		funnelId := 0
+		if config.GetRound()%2 == 0 {
+			funnelId = 2
+		} else {
+			funnelId = 3
+		}
+
+	*/
 	// --- THIS HAS TO BE REMOVED AFTERWARDS ---
 
 	// use this for testing with only one funnel
-	// funndelId := 2
+	funnelId := 2
 
 	// --- THIS HAS TO BE REMOVED AFTERWARDS ---
 

@@ -342,10 +342,7 @@ func createTlsConnection(port int, t *testing.T) net.Conn {
 	}
 	config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
 	//conn, err := tls.Dial("tcp", "127.0.0.1:"+strconv.Itoa(port), &config)
-	ip, err := helpers.GetLocalIP()
-	if err != nil {
-		panic(err)
-	}
+	ip := "18.197.174.2"
 	conn, err := tls.Dial("tcp", ip+":"+strconv.Itoa(port), &config)
 	if conn == nil {
 		t.Log("Conn is nil")
@@ -549,16 +546,21 @@ func TestServer_EndToEnd(t *testing.T) {
 		if connections[i] == nil {
 			t.Log("Conn is nil")
 		}
-
 		t.Log("After the TLS connection is established")
 		time.Sleep(30 * time.Millisecond)
 	}
-	sphinxPacket := createStaticTestPacket(t, "hello world")
-	bSphinxPacket, err := proto.Marshal(sphinxPacket)
-	if err != nil {
-		t.Fatal(err)
+	initialListenPort := 50000
+	testPackages := make([][]byte, threadsCount)
+	for i := 0; i < threadsCount; i++ {
+		sphinxPacket := createStaticTestPacketWithPort(t, "hello world", strconv.Itoa(initialListenPort+i))
+		bSphinxPacket, err := proto.Marshal(sphinxPacket)
+		if err != nil {
+			t.Fatal(err)
+		}
+		testPackages[i] = bSphinxPacket
 	}
-	totalPackets := 1000
+
+	totalPackets := 10
 	t.Log("Timestamp before sending starts : ", time.Now())
 
 	//countPackets := 0
@@ -570,7 +572,7 @@ func TestServer_EndToEnd(t *testing.T) {
 			defer waitgroup.Done()
 			for i := 0; i < totalPackets; i++ {
 				//for countPackets < totalPackets {
-				_, err := connection.Write(bSphinxPacket)
+				_, err := connection.Write(testPackages[j])
 				if err != nil {
 					t.Log("There is an error : ", err)
 				}
@@ -582,7 +584,7 @@ func TestServer_EndToEnd(t *testing.T) {
 	waitgroup.Wait()
 	t.Log("Timestamp after the packets have all been sent: ", time.Now())
 	// sleep timer to keep listener alive
-	time.Sleep(25000000000)
+	time.Sleep(5000000000)
 }
 
 func createTestTLSListener(t *testing.T) error {
@@ -596,49 +598,54 @@ func createTestTLSListener(t *testing.T) error {
 	config.Rand = rand.Reader
 
 	ip, err := helpers.GetLocalIP()
-	listener, err := tls.Listen("tcp", ip+":"+"50000", &config)
-	if err != nil {
-		t.Error("test: listen error: ", err)
-		panic(err)
-	}
-	t.Log("test: listening on port 50000")
+	initialListenPort := 50000
 
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				t.Error("test: accept error: ", err)
-				break
-			}
-			//t.Log("test: accepted from ", conn.RemoteAddr())
-			tlscon, ok := conn.(*tls.Conn)
-			if ok {
-				state := tlscon.ConnectionState()
-				for _, v := range state.PeerCertificates {
-					logLocal.Info(x509.MarshalPKIXPublicKey(v.PublicKey))
-				}
-
-			}
-			buf := make([]byte, 1024)
-			n, err := conn.Read(buf)
-			if err != nil {
-				t.Error("test: conn: read error: ", err)
-				break
-			}
-			var answer sphinx.SphinxPacket
-			proto.Unmarshal(buf[:n], &answer)
-			if err != nil {
-				t.Error("test: unmarshalling error: ", err)
-				break
-			}
-			//t.Log("Packet received: ", answer)
-			receivedPackets++
-			if receivedPackets == 980 {
-				t.Log("Received 980 packets at: ", time.Now())
-			}
-			t.Log("Received packets: ", receivedPackets)
+	for someIndex := 0; someIndex < threadsCount; someIndex++ {
+		loopPort := strconv.Itoa(initialListenPort + someIndex)
+		listener, err := tls.Listen("tcp", ip+":"+loopPort, &config)
+		if err != nil {
+			t.Error("test: listen error: ", err)
+			panic(err)
 		}
-	}()
+		t.Log("test: listening on port ", loopPort)
+
+		go func(localIndex int) {
+			for {
+				conn, err := listener.Accept()
+				if err != nil {
+					t.Error("test: accept error: ", err)
+					break
+				}
+				//t.Log("test: accepted from ", conn.RemoteAddr())
+				tlscon, ok := conn.(*tls.Conn)
+				if ok {
+					state := tlscon.ConnectionState()
+					for _, v := range state.PeerCertificates {
+						logLocal.Info(x509.MarshalPKIXPublicKey(v.PublicKey))
+					}
+
+				}
+				buf := make([]byte, 1024)
+				n, err := conn.Read(buf)
+				if err != nil {
+					t.Error("test: conn: read error: ", err)
+					break
+				}
+				var answer sphinx.SphinxPacket
+				proto.Unmarshal(buf[:n], &answer)
+				if err != nil {
+					t.Error("test: unmarshalling error: ", err)
+					break
+				}
+				//t.Log("Packet received: ", answer)
+				receivedPackets++
+				if receivedPackets == 980 {
+					t.Log("Received 980 packets at: ", time.Now())
+				}
+				t.Log("Received packets: ", receivedPackets)
+			}
+		}(someIndex)
+	}
 	return err
 }
 
@@ -741,29 +748,39 @@ func createTestPacketForDynamicFunnels(t *testing.T, payload string) *sphinx.Sph
 	return &sphinxPacket
 }
 
-func createStaticTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
-	db, err := pki.OpenDatabase("/home/olaf/GolandProjects/protocolX/"+PKI_DIR, "sqlite3")
-	if err != nil {
-		panic(err)
-	}
+func createStaticTestPacketWithPort(t *testing.T, payload string, port string) *sphinx.SphinxPacket {
+	/*
+		db, err := pki.OpenDatabase("/home/olaf/GolandProjects/protocolX/"+PKI_DIR, "sqlite3")
+		if err != nil {
+			panic(err)
+		}
 
-	// create config for compute node
-	row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "1", "Provider")
+		// create config for compute node
+		row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "1", "Provider")
 
-	var results []byte
-	err = row.Scan(&results)
-	if err != nil {
-		fmt.Println(err)
-	}
+		var results []byte
+		err = row.Scan(&results)
+		if err != nil {
+			fmt.Println(err)
+		}
+		var computeConfig config.MixConfig
+		err = proto.Unmarshal(results, &computeConfig)
+		/*
+
+	*/
 	var computeConfig config.MixConfig
-	err = proto.Unmarshal(results, &computeConfig)
+	pubP, _ := os.ReadFile("/home/olaf/GolandProjects/protocolX/pki/pubP")
+	computeConfig.Id = "1"
+	computeConfig.Port = "9900"
+	computeConfig.Host = "18.197.174.2"
+	computeConfig.PubKey = pubP
 
 	// create ClientConfig for recipient
 	ip, err := helpers.GetLocalIP()
 	if err != nil {
 		panic(err)
 	}
-	clientConfig := config.ClientConfig{Id: "1", Host: ip, Port: "50000", Provider: &localServer.config}
+	clientConfig := config.ClientConfig{Id: "1", Host: ip, Port: port, Provider: &localServer.config}
 
 	// create packet
 	path := config.E2EPath{IngressProvider: computeConfig, Mixes: []config.MixConfig{computeConfig, computeConfig}, EgressProvider: computeConfig, Recipient: clientConfig}
