@@ -56,6 +56,7 @@ var curve = elliptic.P224()
 
 const (
 	testDatabase = "testDatabase.db"
+	remoteIP     = "3.70.170.112" // remote IP of compute for testing
 )
 
 func createTestServer() (*Server, error) {
@@ -342,7 +343,7 @@ func createTlsConnection(port int, t *testing.T) net.Conn {
 	}
 	config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
 	//conn, err := tls.Dial("tcp", "127.0.0.1:"+strconv.Itoa(port), &config)
-	ip := "18.197.174.2"
+	ip := remoteIP
 	conn, err := tls.Dial("tcp", ip+":"+strconv.Itoa(port), &config)
 	if conn == nil {
 		t.Log("Conn is nil")
@@ -568,18 +569,18 @@ func TestServer_EndToEnd(t *testing.T) {
 	for j := 0; j < threadsCount; j++ {
 		waitgroup.Add(1)
 		conn := connections[j]
-		go func(connection net.Conn) {
+		go func(connection net.Conn, index int) {
 			defer waitgroup.Done()
 			for i := 0; i < totalPackets; i++ {
 				//for countPackets < totalPackets {
-				_, err := connection.Write(testPackages[j])
+				_, err := connection.Write(testPackages[index])
 				if err != nil {
 					t.Log("There is an error : ", err)
 				}
 				//countPackets++
 				//t.Log(countPackets)
 			}
-		}(conn)
+		}(conn, j)
 	}
 	waitgroup.Wait()
 	t.Log("Timestamp after the packets have all been sent: ", time.Now())
@@ -772,7 +773,7 @@ func createStaticTestPacketWithPort(t *testing.T, payload string, port string) *
 	pubP, _ := os.ReadFile("/home/olaf/GolandProjects/protocolX/pki/pubP")
 	computeConfig.Id = "1"
 	computeConfig.Port = "9900"
-	computeConfig.Host = "18.197.174.2"
+	computeConfig.Host = remoteIP
 	computeConfig.PubKey = pubP
 
 	// create ClientConfig for recipient
