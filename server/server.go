@@ -56,8 +56,8 @@ var (
 	messageDelivered = 0
 	isMapper         = true
 	// runningIndex = 0
-	msgCount         = 100000
-	threadsCount     = 4
+	msgCount         = 500000
+	threadsCount     = 1
 	staticServerRole = ""
 	lbCtr            = 0
 
@@ -88,10 +88,11 @@ type Server struct {
 	assignedClients map[string]ClientRecord
 	config          config.MixConfig
 
-	aPac            []node.MixPacket
-	receivedPackets [][][]byte
-	mutex           sync.Mutex
-	runningIndex    []int
+	aPac                []node.MixPacket
+	receivedPackets     [][][]byte
+	mutex               sync.Mutex
+	runningIndex        []int
+	indexSinceLastRelay []int // used by funnel to determine which packets are new
 
 	connections          map[int][]*tls.Conn  // TLS connection to funnels
 	connectionsToCompute map[string]*tls.Conn // TLS connection to funnels
@@ -111,6 +112,7 @@ type ClientRecord struct {
 func (p *Server) Start() error {
 	p.aPac = make([]node.MixPacket, 0)
 	p.runningIndex = make([]int, threadsCount)
+	p.indexSinceLastRelay = make([]int, threadsCount)
 	for i := 0; i < threadsCount; i++ {
 		p.runningIndex[i] = 0
 	}
@@ -208,6 +210,7 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 		// forward to random active funnel node
 		//if newPacket.Flag == "\xF1" {
 		p.forwardPacketToFunnel(computePacket, funnelId)
+		logLocal.Info("ComputePacket - Adress: ", computePacket.NextHop)
 		relayedPackets++
 		//} else {
 		//	logLocal.Info("Server: Packet has non-forward flag. Packet dropped")
@@ -415,7 +418,7 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 	//logLocal.Info("Address to be processed: ", computePacket.NextHop)
 	if len(computePacket.NextHop) == 0 {
 		logLocal.Info("Empty next hop! Not relaying!")
-		logLocal.Error("Packet: ", computePacket)
+		//logLocal.Error("Packet: ", computePacket)
 		return
 	}
 	dstIp := strings.SplitAfter(computePacket.NextHop, ":")[0]
@@ -836,11 +839,13 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 func (p *Server) rearrangeReceivedPackets() [][]byte {
 	outboundPackets := make([][]byte, 0)
 	// iterate over the packages of each thread but just until the index marking new packages ends so nothing is sent multiple times
-	for i, packagesPerThread := range p.receivedPackets {
-		numOfPacketsInThread := p.runningIndex[i]
-		newPackages := packagesPerThread[:numOfPacketsInThread]
+	for i, packagesPerThread := range p.receivedPackets { // first dimension is per thread
+		newPackages := packagesPerThread[p.indexSinceLastRelay[i]:p.runningIndex[i]]
+		p.indexSinceLastRelay[i] = p.runningIndex[i]
 		for _, packet := range newPackages {
-			outboundPackets = append(outboundPackets, packet)
+			if len(packet) > 0 {
+				outboundPackets = append(outboundPackets, packet)
+			}
 		}
 	}
 	mrand.Seed(time.Now().Unix())
@@ -848,9 +853,11 @@ func (p *Server) rearrangeReceivedPackets() [][]byte {
 		outboundPackets[i], outboundPackets[j] = outboundPackets[j], outboundPackets[i]
 	})
 	// reset indices to use in next round
-	for i := 0; i < threadsCount; i++ {
-		p.runningIndex[i] = 0
-	}
+	/*
+		for i := 0; i < threadsCount; i++ {
+			p.runningIndex[i] = 0
+		}
+	*/
 	return outboundPackets
 }
 

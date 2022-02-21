@@ -21,6 +21,7 @@ import (
 	"github.com/dedas111/protocolX/node"
 	"github.com/dedas111/protocolX/pki"
 	"github.com/dedas111/protocolX/sphinx"
+	"github.com/stretchr/testify/assert"
 	mrand "math/rand"
 
 	//"crypto/curve25519"
@@ -56,7 +57,7 @@ var curve = elliptic.P224()
 
 const (
 	testDatabase = "testDatabase.db"
-	remoteIP     = "3.70.170.112" // remote IP of compute for testing
+	remoteIP     = "192.168.178.84" // remote IP of compute for testing
 )
 
 func createTestServer() (*Server, error) {
@@ -541,7 +542,8 @@ func TestServer_EndToEnd(t *testing.T) {
 	var connections = make([]net.Conn, threadsCount)
 
 	for i := 0; i < threadsCount; i++ {
-		t.Log("After the server starts")
+		//t.Log("After the server starts")
+		fmt.Println("After the server starts")
 		port := 9900 + i // compute node acts as provider (takes client messages)
 		connections[i] = createTlsConnection(port, t)
 		if connections[i] == nil {
@@ -561,7 +563,7 @@ func TestServer_EndToEnd(t *testing.T) {
 		testPackages[i] = bSphinxPacket
 	}
 
-	totalPackets := 10
+	totalPackets := 100
 	t.Log("Timestamp before sending starts : ", time.Now())
 
 	//countPackets := 0
@@ -585,7 +587,83 @@ func TestServer_EndToEnd(t *testing.T) {
 	waitgroup.Wait()
 	t.Log("Timestamp after the packets have all been sent: ", time.Now())
 	// sleep timer to keep listener alive
-	time.Sleep(5000000000)
+	time.Sleep(35000000000)
+}
+
+func TestServer_EndToEndVariousPacket(t *testing.T) {
+	go createTestTLSListener(t)
+
+	threadsCount = 1
+	var connections = make([]net.Conn, threadsCount)
+
+	for i := 0; i < threadsCount; i++ {
+		//t.Log("After the server starts")
+		fmt.Println("After the server starts")
+		port := 9900 + i // compute node acts as provider (takes client messages)
+		connections[i] = createTlsConnection(port, t)
+		if connections[i] == nil {
+			t.Log("Conn is nil")
+		}
+		t.Log("After the TLS connection is established")
+		time.Sleep(30 * time.Millisecond)
+	}
+
+	totalPackets := 100
+	t.Log("Timestamp before sending starts : ", time.Now())
+
+	//countPackets := 0
+	var waitgroup sync.WaitGroup
+	for j := 0; j < threadsCount; j++ {
+		waitgroup.Add(1)
+		conn := connections[j]
+		go func(connection net.Conn, index int) {
+			defer waitgroup.Done()
+			for i := 0; i < totalPackets; i++ {
+				//for countPackets < totalPackets {
+				initialListenPort := 50000
+				sphinxPacket := createStaticTestPacketWithPort(t, strconv.Itoa(i), strconv.Itoa(initialListenPort))
+				bSphinxPacket, err := proto.Marshal(sphinxPacket)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, err = connection.Write(bSphinxPacket)
+				if err != nil {
+					t.Log("There is an error : ", err)
+				}
+				//countPackets++
+				//t.Log(countPackets)
+			}
+		}(conn, j)
+	}
+	waitgroup.Wait()
+	t.Log("Timestamp after the packets have all been sent: ", time.Now())
+	// sleep timer to keep listener alive
+	time.Sleep(15000000000)
+}
+
+func TestServer_RearrangePacketsOneThread(t *testing.T) {
+	runningIndex := make([]int, 1)
+	runningIndex[0] = 4
+
+	indexForRelay := make([]int, 1)
+	indexForRelay[0] = 2
+
+	firstPacket, _ := proto.Marshal(createStaticTestPacketWithPort(t, "1", "9900"))
+	secondPacket, _ := proto.Marshal(createStaticTestPacketWithPort(t, "2", "9900"))
+	thirdPacket, _ := proto.Marshal(createStaticTestPacketWithPort(t, "3", "9900"))
+	fourthPacket, _ := proto.Marshal(createStaticTestPacketWithPort(t, "4", "9900"))
+
+	receivedPackets := make([][][]byte, 1)
+	receivedPackets[0] = make([][]byte, 4)
+	receivedPackets[0][0] = firstPacket
+	receivedPackets[0][1] = secondPacket
+	receivedPackets[0][2] = thirdPacket
+	receivedPackets[0][3] = fourthPacket
+
+	testServer := Server{receivedPackets: receivedPackets, runningIndex: runningIndex, indexSinceLastRelay: indexForRelay}
+	rearrangedPackets := testServer.rearrangeReceivedPackets()
+
+	assert.Equal(t, 2, len(rearrangedPackets))
 }
 
 func createTestTLSListener(t *testing.T) error {
