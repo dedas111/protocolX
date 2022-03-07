@@ -426,7 +426,7 @@ func TestServer_TlsConnectionReceive(t *testing.T) {
 	t.Log("Timestamp after the testrun ends : ", time.Now())
 	// t.Log("After the TLS connection is established")
 	// time.Sleep(300 * time.Millisecond)
-	// assert.Equal(t, totalPackets, localServer.runningIndex, "All the messages are not processed.")
+	// assert.Equal(t, totalPackets, localServer.array, "All the messages are not processed.")
 }
 
 func TestServer_TlsMemoryLoad(t *testing.T) {
@@ -497,7 +497,7 @@ func TestServer_TlsMemoryLoad(t *testing.T) {
 	// time.Sleep(10000 * time.Millisecond)
 	// t.Log("After the TLS connection is established")
 	// time.Sleep(300 * time.Millisecond)
-	// assert.Equal(t, toalPackets, localServer.runningIndex, "All the messages are not processed.")
+	// assert.Equal(t, toalPackets, localServer.array, "All the messages are not processed.")
 }
 
 func TestServer_SphinxPacketSize(t *testing.T) {
@@ -587,8 +587,57 @@ func TestServer_EndToEnd(t *testing.T) {
 	waitgroup.Wait()
 	t.Log("Timestamp after the packets have all been sent: ", time.Now())
 	// sleep timer to keep listener alive
+	time.Sleep(15000000000)
+}
+
+func TestServer_Unencrypted(t *testing.T) {
+	go createTestTLSListener(t)
+
+	threadsCount = 1
+	var connections = make([]net.Conn, threadsCount)
+
+	for i := 0; i < threadsCount; i++ {
+		//t.Log("After the server starts")
+		fmt.Println("After the server starts")
+		port := 9900 + i // compute node acts as provider (takes client messages)
+		connections[i] = createTlsConnection(port, t)
+		if connections[i] == nil {
+			t.Log("Conn is nil")
+		}
+		t.Log("After the TLS connection is established")
+		time.Sleep(30 * time.Millisecond)
+	}
+
+	totalPackets := 100
+	t.Log("Timestamp before sending starts : ", time.Now())
+
+	var waitgroup sync.WaitGroup
+	for j := 0; j < threadsCount; j++ {
+		waitgroup.Add(1)
+		conn := connections[j]
+		go func(connection net.Conn, index int) {
+			defer waitgroup.Done()
+			for i := 0; i < totalPackets; i++ {
+				//for countPackets < totalPackets {
+				payload := []byte(strconv.Itoa(i))
+				t.Log("Sending packet with id ", i, " and bytes: ", payload)
+				computePacket := config.ComputePacket{NextHop: "192.168.178.84:50000", Data: payload}
+				bComputePacket, err := proto.Marshal(&computePacket)
+				_, err = connection.Write(bComputePacket)
+				if err != nil {
+					t.Log("There is an error : ", err)
+				}
+			}
+		}(conn, j)
+	}
+	waitgroup.Wait()
+	t.Log("Timestamp after the packets have all been sent: ", time.Now())
+	// sleep timer to keep listener alive
 	time.Sleep(35000000000)
 }
+
+//		computePacket := config.ComputePacket{NextHop: "", Data: []byte(strconv.Itoa(ctr))}
+//		bComputePacket, err := proto.Marshal(&computePacket)
 
 func TestServer_EndToEndVariousPacket(t *testing.T) {
 	go createTestTLSListener(t)
@@ -608,7 +657,7 @@ func TestServer_EndToEndVariousPacket(t *testing.T) {
 		time.Sleep(30 * time.Millisecond)
 	}
 
-	totalPackets := 100
+	totalPackets := 10
 	t.Log("Timestamp before sending starts : ", time.Now())
 
 	//countPackets := 0
@@ -638,32 +687,96 @@ func TestServer_EndToEndVariousPacket(t *testing.T) {
 	waitgroup.Wait()
 	t.Log("Timestamp after the packets have all been sent: ", time.Now())
 	// sleep timer to keep listener alive
-	time.Sleep(15000000000)
+	time.Sleep(35000000000)
 }
 
-func TestServer_RearrangePacketsOneThread(t *testing.T) {
-	runningIndex := make([]int, 1)
-	runningIndex[0] = 4
+func TestServer_AddPacketsAndRearrange(t *testing.T) {
+	packetCount := 1000
+	threadCount := 5
 
-	indexForRelay := make([]int, 1)
-	indexForRelay[0] = 2
+	runningIndex := make([]int, threadCount)
+	indexForRelay := make([]int, threadCount)
+	receivedPackets := make([][][]byte, threadCount)
+	for j := 0; j < threadCount; j++ {
+		receivedPackets[j] = make([][]byte, packetCount*2)
+	}
+	outboundPackets := make([][]byte, 0)
+	recPackets := ConcurrentReceivedPackets{array: receivedPackets, mu: sync.Mutex{}}
+	runIndex := ConcurrentIndex{array: runningIndex, mu: sync.Mutex{}}
 
-	firstPacket, _ := proto.Marshal(createStaticTestPacketWithPort(t, "1", "9900"))
-	secondPacket, _ := proto.Marshal(createStaticTestPacketWithPort(t, "2", "9900"))
-	thirdPacket, _ := proto.Marshal(createStaticTestPacketWithPort(t, "3", "9900"))
-	fourthPacket, _ := proto.Marshal(createStaticTestPacketWithPort(t, "4", "9900"))
+	testServer := Server{receivedPackets: recPackets, runningIndex: runIndex, indexSinceLastRelay: indexForRelay}
 
-	receivedPackets := make([][][]byte, 1)
-	receivedPackets[0] = make([][]byte, 4)
-	receivedPackets[0][0] = firstPacket
-	receivedPackets[0][1] = secondPacket
-	receivedPackets[0][2] = thirdPacket
-	receivedPackets[0][3] = fourthPacket
+	ctr := 0
+	var waitgroup sync.WaitGroup
+	for j := 0; j < threadCount; j++ { // loop for threads
+		waitgroup.Add(1)
+		go func(threadId int, ctr int) {
+			//time.Sleep(time.Duration(50 * ctr))
+			defer waitgroup.Done()
+			for i := 0; i < packetCount; i++ {
+				payload := []byte(strconv.Itoa(ctr))
+				computePacket := config.ComputePacket{NextHop: "192.168.178.84:50000", Data: payload}
+				bComputePacket, err := proto.Marshal(&computePacket)
+				if err != nil {
+					panic(err)
+				}
+				testServer.receivedPacketWithIndex(bComputePacket, threadId)
+				ctr++
+			}
+		}(j, ctr)
+	}
 
-	testServer := Server{receivedPackets: receivedPackets, runningIndex: runningIndex, indexSinceLastRelay: indexForRelay}
+	// rearranging here before waiting with go routine
+	waitgroup.Add(1)
+	go func(testServer Server) {
+		defer waitgroup.Done()
+		time.Sleep(200)
+		packets := testServer.rearrangeReceivedPackets()
+		outboundPackets = append(outboundPackets, packets...)
+	}(testServer)
+
+	waitgroup.Wait()
 	rearrangedPackets := testServer.rearrangeReceivedPackets()
+	outboundPackets = append(outboundPackets, rearrangedPackets...)
+	assert.Equal(t, packetCount, testServer.indexSinceLastRelay[0])
+	assert.Equal(t, packetCount*threadCount, len(outboundPackets))
+	// ---------------------------- Second wave of packets ---------------------------- \\
+	/*
 
-	assert.Equal(t, 2, len(rearrangedPackets))
+
+		for j := 0; j < threadCount; j++ { // loop for threads
+			waitgroup.Add(1)
+			go func(threadId int, ctr int) {
+				time.Sleep(time.Duration(500 * ctr))
+				defer waitgroup.Done()
+				for i := 0; i < packetCount; i++ {
+					payload := []byte(strconv.Itoa(ctr))
+					computePacket := config.ComputePacket{NextHop: "192.168.178.84:50000", Data: payload}
+					bComputePacket, err := proto.Marshal(&computePacket)
+					if err != nil {
+						panic(err)
+					}
+					testServer.receivedPacketWithIndex(bComputePacket, threadId)
+					ctr++
+				}
+			}(j, ctr)
+		}
+
+		// rearranging here before waiting with go routine
+		waitgroup.Add(1)
+		go func(testServer Server) {
+			defer waitgroup.Done()
+			packets := testServer.rearrangeReceivedPackets()
+			outboundPackets = append(outboundPackets, packets...)
+		}(testServer)
+
+		waitgroup.Wait()
+		rearrangedPackets = testServer.rearrangeReceivedPackets()
+		outboundPackets = append(outboundPackets, rearrangedPackets...)
+	*/
+
+	//assert.Equal(t, 2*packetCount, testServer.indexSinceLastRelay[0])
+	//assert.Equal(t, 2*packetCount*threadCount, len(outboundPackets))
 }
 
 func createTestTLSListener(t *testing.T) error {
@@ -710,12 +823,15 @@ func createTestTLSListener(t *testing.T) error {
 					t.Error("test: conn: read error: ", err)
 					break
 				}
+
 				var answer sphinx.SphinxPacket
 				proto.Unmarshal(buf[:n], &answer)
 				if err != nil {
 					t.Error("test: unmarshalling error: ", err)
 					break
 				}
+
+				t.Log("Received: ", string(buf[:n]))
 				//t.Log("Packet received: ", answer)
 				receivedPackets++
 				if receivedPackets == 980 {
@@ -855,10 +971,14 @@ func createStaticTestPacketWithPort(t *testing.T, payload string, port string) *
 	computeConfig.PubKey = pubP
 
 	// create ClientConfig for recipient
-	ip, err := helpers.GetLocalIP()
-	if err != nil {
-		panic(err)
-	}
+	/*
+		ip, err := helpers.GetLocalIP()
+		if err != nil {
+			panic(err)
+		}
+
+	*/
+	ip := "192.168.178.84"
 	clientConfig := config.ClientConfig{Id: "1", Host: ip, Port: port, Provider: &localServer.config}
 
 	// create packet

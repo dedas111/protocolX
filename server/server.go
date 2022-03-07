@@ -55,11 +55,12 @@ var (
 	relayedPackets   = 0
 	messageDelivered = 0
 	isMapper         = true
-	// runningIndex = 0
+	// array = 0
 	msgCount         = 500000
 	threadsCount     = 1
 	staticServerRole = ""
 	lbCtr            = 0
+	emptyCtr         = 0
 
 	logLocal = logging.PackageLogger()
 )
@@ -77,6 +78,16 @@ type ProviderIt interface {
 	GetConfig() config.MixConfig
 }
 
+type ConcurrentIndex struct {
+	mu    sync.Mutex
+	array []int
+}
+
+type ConcurrentReceivedPackets struct {
+	mu    sync.Mutex
+	array [][][]byte
+}
+
 type Server struct {
 	id   string
 	host string
@@ -89,9 +100,9 @@ type Server struct {
 	config          config.MixConfig
 
 	aPac                []node.MixPacket
-	receivedPackets     [][][]byte
 	mutex               sync.Mutex
-	runningIndex        []int
+	runningIndex        ConcurrentIndex
+	receivedPackets     ConcurrentReceivedPackets
 	indexSinceLastRelay []int // used by funnel to determine which packets are new
 
 	connections          map[int][]*tls.Conn  // TLS connection to funnels
@@ -111,15 +122,15 @@ type ClientRecord struct {
 // signaling whether any operation was unsuccessful
 func (p *Server) Start() error {
 	p.aPac = make([]node.MixPacket, 0)
-	p.runningIndex = make([]int, threadsCount)
+	p.runningIndex.array = make([]int, threadsCount)
 	p.indexSinceLastRelay = make([]int, threadsCount)
 	for i := 0; i < threadsCount; i++ {
-		p.runningIndex[i] = 0
+		p.runningIndex.array[i] = 0
 	}
 
-	p.receivedPackets = make([][][]byte, threadsCount)
+	p.receivedPackets.array = make([][][]byte, threadsCount)
 	for i := 0; i < threadsCount; i++ {
-		p.receivedPackets[i] = make([][]byte, msgCount)
+		p.receivedPackets.array[i] = make([][]byte, msgCount)
 	}
 	p.run()
 	return nil
@@ -138,6 +149,17 @@ func (p *Server) run() {
 	sleepTime := config.GetRemainingRoundTime()
 	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
+	// TODO: remove if after performance testing
+	if !(staticServerRole == "funnel" || staticServerRole == "compute") {
+		p.setCurrentRole()
+	} else {
+		if staticServerRole == "funnel" {
+			isMapper = true
+		} else {
+			isMapper = false
+		}
+	}
+
 	go func() {
 		// create tick
 		d := time.NewTicker(config.RoundDuration)
@@ -146,17 +168,7 @@ func (p *Server) run() {
 			case <-d.C:
 				time.Sleep(200)
 				p.sendOutboundFunnelMessages()
-				// TODO: remove if after performance testing
-				if !(staticServerRole == "funnel" || staticServerRole == "compute") {
-					p.setCurrentRole()
-				} else {
-					if staticServerRole == "funnel" {
-						isMapper = true
-					} else {
-						isMapper = false
-					}
-				}
-				// logLocal.Info("Is funnel: ", isMapper)
+				//p.setCurrentRole()
 			}
 		}
 	}()
@@ -188,25 +200,37 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 	if isMapper { //funnel functionality
 		//logLocal.Info("funnel functionality")
 		// p.aPac[index] = packet
-		p.receivedPackets[someIndex][p.runningIndex[someIndex]] = packet
-		p.runningIndex[someIndex]++
-		if p.runningIndex[someIndex] == 1 {
-			logLocal.Info("First packet. Time:", time.Now())
-		} else if p.runningIndex[someIndex] == msgCount {
-			logLocal.Info("Last packet. Time:", time.Now())
-			p.runningIndex[someIndex] = 0
-		}
+		p.receivedPackets.mu.Lock()
+		p.runningIndex.mu.Lock()
+		p.receivedPackets.array[someIndex][p.runningIndex.array[someIndex]] = packet
+		p.runningIndex.array[someIndex]++
+		/*
+			if p.array[someIndex] == 1 {
+				logLocal.Info("First packet. Time:", time.Now())
+			} else if p.array[someIndex] == msgCount {
+				logLocal.Info("Last packet. Time:", time.Now())
+				p.array[someIndex] = 0
+			}
+		*/
+		logLocal.Info("array: ", p.runningIndex)
+		p.receivedPackets.mu.Unlock()
+		p.runningIndex.mu.Unlock()
 	} else { //compute node functionality
 		logLocal.Info("compute functionality")
 		funnelId := p.establishConnectionToRandomFunnel()
 
-		newPacket, err := p.ProcessPacketInSameThread(packet)
-		if err != nil {
-			return err
-		}
-		logLocal.Info("NewPacket - Adress: ", newPacket.Adr.Address)
+		//newPacket, err := p.ProcessPacketInSameThread(packet)
+		//if err != nil {
+		//return err
+		//}
+		var compPacket config.ComputePacket
+		proto.Unmarshal(packet, &compPacket)
+		logLocal.Info("compPacket - Bytes: ", compPacket.Data)
 
-		computePacket := config.ComputePacket{Data: newPacket.Data, NextHop: newPacket.Adr.Address}
+		//logLocal.Info("NewPacket - Adress: ", newPacket.Adr.Address)
+		logLocal.Info("NewPacket - Adress: ", compPacket.NextHop)
+
+		computePacket := config.ComputePacket{Data: compPacket.Data, NextHop: compPacket.NextHop}
 		// forward to random active funnel node
 		//if newPacket.Flag == "\xF1" {
 		p.forwardPacketToFunnel(computePacket, funnelId)
@@ -218,7 +242,6 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 		logLocal.Info("Relayed packets: ", relayedPackets)
 		logLocal.Info("-------------------------------------------------------------")
 	}
-
 	// cPac := make(chan node.MixPacket)
 	// errCh := make(chan error)
 
@@ -417,8 +440,10 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 	// experimental loadbalancing here - use different destination ports for relay
 	//logLocal.Info("Address to be processed: ", computePacket.NextHop)
 	if len(computePacket.NextHop) == 0 {
-		logLocal.Info("Empty next hop! Not relaying!")
-		//logLocal.Error("Packet: ", computePacket)
+		//logLocal.Info("Empty next hop! Not relaying!")
+		emptyCtr++
+		logLocal.Error("Not relayed due to empty next hop: ", emptyCtr)
+		logLocal.Info("Payload: ", computePacket.Data)
 		return
 	}
 	dstIp := strings.SplitAfter(computePacket.NextHop, ":")[0]
@@ -839,15 +864,20 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 func (p *Server) rearrangeReceivedPackets() [][]byte {
 	outboundPackets := make([][]byte, 0)
 	// iterate over the packages of each thread but just until the index marking new packages ends so nothing is sent multiple times
-	for i, packagesPerThread := range p.receivedPackets { // first dimension is per thread
-		newPackages := packagesPerThread[p.indexSinceLastRelay[i]:p.runningIndex[i]]
-		p.indexSinceLastRelay[i] = p.runningIndex[i]
+	p.receivedPackets.mu.Lock()
+	p.runningIndex.mu.Lock()
+	for i, packagesPerThread := range p.receivedPackets.array { // first dimension is per thread
+		workIndex := p.runningIndex.array[i]
+		newPackages := packagesPerThread[p.indexSinceLastRelay[i]:workIndex]
+		p.indexSinceLastRelay[i] = workIndex
 		for _, packet := range newPackages {
 			if len(packet) > 0 {
 				outboundPackets = append(outboundPackets, packet)
 			}
 		}
 	}
+	p.receivedPackets.mu.Unlock()
+	p.runningIndex.mu.Unlock()
 	mrand.Seed(time.Now().Unix())
 	mrand.Shuffle(len(outboundPackets), func(i, j int) {
 		outboundPackets[i], outboundPackets[j] = outboundPackets[j], outboundPackets[i]
@@ -855,7 +885,7 @@ func (p *Server) rearrangeReceivedPackets() [][]byte {
 	// reset indices to use in next round
 	/*
 		for i := 0; i < threadsCount; i++ {
-			p.runningIndex[i] = 0
+			p.array[i] = 0
 		}
 	*/
 	return outboundPackets
