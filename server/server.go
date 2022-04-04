@@ -57,7 +57,7 @@ var (
 	isMapper         = true
 	// array = 0
 	msgCount         = 500000
-	threadsCount     = 1
+	threadsCount     = 1 // gets overridden by amount of system cores
 	staticServerRole = ""
 	lbCtr            = 0
 	emptyCtr         = 0
@@ -202,7 +202,9 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 		// p.aPac[index] = packet
 		p.receivedPackets.mu.Lock()
 		p.runningIndex.mu.Lock()
-		p.receivedPackets.array[someIndex][p.runningIndex.array[someIndex]] = packet
+		packetForSaving := make([]byte, len(packet))
+		copy(packetForSaving, packet)
+		p.receivedPackets.array[someIndex][p.runningIndex.array[someIndex]] = packetForSaving
 		p.runningIndex.array[someIndex]++
 		/*
 			if p.array[someIndex] == 1 {
@@ -212,7 +214,6 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 				p.array[someIndex] = 0
 			}
 		*/
-		logLocal.Info("array: ", p.runningIndex)
 		p.receivedPackets.mu.Unlock()
 		p.runningIndex.mu.Unlock()
 	} else { //compute node functionality
@@ -339,7 +340,7 @@ func (p *Server) forwardPacketToFunnel(computePacket config.ComputePacket, funne
 	if err != nil {
 		logLocal.WithError(err)
 	}
-	packetBytes, err := config.WrapWithFlag(commFlag, computeBytes)
+	packetBytes, err := config.WrapWithFlag(commFlag, computeBytes) // generalPacket is created here
 	if err != nil {
 		return err
 	}
