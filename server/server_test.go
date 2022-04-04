@@ -564,7 +564,7 @@ func TestServer_EndToEnd(t *testing.T) {
 		testPackages[i] = bSphinxPacket
 	}
 
-	totalPackets := 10
+	totalPackets := 100
 	t.Log("Timestamp before sending starts : ", time.Now())
 
 	//countPackets := 0
@@ -704,10 +704,8 @@ func TestServer_AddPacketsAndRearrange(t *testing.T) {
 		receivedPackets[j] = make([][]byte, packetCount*2)
 	}
 	outboundPackets := make([][]byte, 0)
-	recPackets := ConcurrentReceivedPackets{array: receivedPackets, mu: sync.Mutex{}}
-	runIndex := ConcurrentIndex{array: runningIndex, mu: sync.Mutex{}}
 
-	testServer := Server{receivedPackets: recPackets, runningIndex: runIndex, indexSinceLastRelay: indexForRelay}
+	testServer := Server{receivedPackets: receivedPackets, runningIndex: runningIndex, indexSinceLastRelay: indexForRelay}
 
 	ctr := 0
 	var waitgroup sync.WaitGroup

@@ -78,16 +78,6 @@ type ProviderIt interface {
 	GetConfig() config.MixConfig
 }
 
-type ConcurrentIndex struct {
-	mu    sync.Mutex
-	array []int
-}
-
-type ConcurrentReceivedPackets struct {
-	mu    sync.Mutex
-	array [][][]byte
-}
-
 type Server struct {
 	id   string
 	host string
@@ -101,8 +91,8 @@ type Server struct {
 
 	aPac                []node.MixPacket
 	mutex               sync.Mutex
-	runningIndex        ConcurrentIndex
-	receivedPackets     ConcurrentReceivedPackets
+	runningIndex        []int
+	receivedPackets     [][][]byte
 	indexSinceLastRelay []int // used by funnel to determine which packets are new
 
 	connections          map[int][]*tls.Conn  // TLS connection to funnels
@@ -122,15 +112,15 @@ type ClientRecord struct {
 // signaling whether any operation was unsuccessful
 func (p *Server) Start() error {
 	p.aPac = make([]node.MixPacket, 0)
-	p.runningIndex.array = make([]int, threadsCount)
+	p.runningIndex = make([]int, threadsCount)
 	p.indexSinceLastRelay = make([]int, threadsCount)
 	for i := 0; i < threadsCount; i++ {
-		p.runningIndex.array[i] = 0
+		p.runningIndex[i] = 0
 	}
 
-	p.receivedPackets.array = make([][][]byte, threadsCount)
+	p.receivedPackets = make([][][]byte, threadsCount)
 	for i := 0; i < threadsCount; i++ {
-		p.receivedPackets.array[i] = make([][]byte, msgCount)
+		p.receivedPackets[i] = make([][]byte, msgCount)
 	}
 	p.run()
 	return nil
@@ -200,12 +190,10 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 	if isMapper { //funnel functionality
 		//logLocal.Info("funnel functionality")
 		// p.aPac[index] = packet
-		p.receivedPackets.mu.Lock()
-		p.runningIndex.mu.Lock()
 		packetForSaving := make([]byte, len(packet))
 		copy(packetForSaving, packet)
-		p.receivedPackets.array[someIndex][p.runningIndex.array[someIndex]] = packetForSaving
-		p.runningIndex.array[someIndex]++
+		p.receivedPackets[someIndex][p.runningIndex[someIndex]] = packetForSaving
+		p.runningIndex[someIndex]++
 		/*
 			if p.array[someIndex] == 1 {
 				logLocal.Info("First packet. Time:", time.Now())
@@ -214,8 +202,6 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 				p.array[someIndex] = 0
 			}
 		*/
-		p.receivedPackets.mu.Unlock()
-		p.runningIndex.mu.Unlock()
 	} else { //compute node functionality
 		logLocal.Info("compute functionality")
 		funnelId := p.establishConnectionToRandomFunnel()
@@ -863,10 +849,8 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 func (p *Server) rearrangeReceivedPackets() [][]byte {
 	outboundPackets := make([][]byte, 0)
 	// iterate over the packages of each thread but just until the index marking new packages ends so nothing is sent multiple times
-	p.receivedPackets.mu.Lock()
-	p.runningIndex.mu.Lock()
-	for i, packagesPerThread := range p.receivedPackets.array { // first dimension is per thread
-		workIndex := p.runningIndex.array[i]
+	for i, packagesPerThread := range p.receivedPackets { // first dimension is per thread
+		workIndex := p.runningIndex[i]
 		newPackages := packagesPerThread[p.indexSinceLastRelay[i]:workIndex]
 		p.indexSinceLastRelay[i] = workIndex
 		for _, packet := range newPackages {
@@ -875,8 +859,6 @@ func (p *Server) rearrangeReceivedPackets() [][]byte {
 			}
 		}
 	}
-	p.receivedPackets.mu.Unlock()
-	p.runningIndex.mu.Unlock()
 	mrand.Seed(time.Now().Unix())
 	mrand.Shuffle(len(outboundPackets), func(i, j int) {
 		outboundPackets[i], outboundPackets[j] = outboundPackets[j], outboundPackets[i]
