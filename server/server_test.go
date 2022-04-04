@@ -535,6 +535,7 @@ func TestServer_CheckMultipleFunnels(t *testing.T) {
 	// Create Message and send it to funnel using compute node
 }
 
+// this test sends sphinx encrypted packets to servers and expects them to answer using a listener
 func TestServer_EndToEnd(t *testing.T) {
 	go createTestTLSListener(t)
 
@@ -563,7 +564,7 @@ func TestServer_EndToEnd(t *testing.T) {
 		testPackages[i] = bSphinxPacket
 	}
 
-	totalPackets := 100
+	totalPackets := 10
 	t.Log("Timestamp before sending starts : ", time.Now())
 
 	//countPackets := 0
@@ -590,6 +591,7 @@ func TestServer_EndToEnd(t *testing.T) {
 	time.Sleep(15000000000)
 }
 
+// run only if the server accepts unencrypted packets
 func TestServer_Unencrypted(t *testing.T) {
 	go createTestTLSListener(t)
 
@@ -639,6 +641,7 @@ func TestServer_Unencrypted(t *testing.T) {
 //		computePacket := config.ComputePacket{NextHop: "", Data: []byte(strconv.Itoa(ctr))}
 //		bComputePacket, err := proto.Marshal(&computePacket)
 
+// this test sends sphinx encrypted packets (increaing the payload of each packet to use unique packets) to servers and expects them to answer using a listener
 func TestServer_EndToEndVariousPacket(t *testing.T) {
 	go createTestTLSListener(t)
 
@@ -657,7 +660,7 @@ func TestServer_EndToEndVariousPacket(t *testing.T) {
 		time.Sleep(30 * time.Millisecond)
 	}
 
-	totalPackets := 10
+	totalPackets := 1000
 	t.Log("Timestamp before sending starts : ", time.Now())
 
 	//countPackets := 0

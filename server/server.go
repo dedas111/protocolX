@@ -220,18 +220,16 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 		logLocal.Info("compute functionality")
 		funnelId := p.establishConnectionToRandomFunnel()
 
-		//newPacket, err := p.ProcessPacketInSameThread(packet)
-		//if err != nil {
-		//return err
-		//}
-		var compPacket config.ComputePacket
-		proto.Unmarshal(packet, &compPacket)
-		logLocal.Info("compPacket - Bytes: ", compPacket.Data)
+		newPacket, err := p.ProcessPacketInSameThread(packet)
+		if err != nil {
+			return err
+		}
+		// unencrypted case
+		//var compPacket config.ComputePacket
+		//proto.Unmarshal(packet, &compPacket)
 
-		//logLocal.Info("NewPacket - Adress: ", newPacket.Adr.Address)
-		logLocal.Info("NewPacket - Adress: ", compPacket.NextHop)
+		computePacket := config.ComputePacket{Data: newPacket.Data, NextHop: newPacket.Adr.Address}
 
-		computePacket := config.ComputePacket{Data: compPacket.Data, NextHop: compPacket.NextHop}
 		// forward to random active funnel node
 		//if newPacket.Flag == "\xF1" {
 		p.forwardPacketToFunnel(computePacket, funnelId)
