@@ -55,6 +55,10 @@ var localServer *Server
 var anotherServer *Server
 var curve = elliptic.P224()
 
+var packetCountTest int
+var tsStart time.Time
+var tsDone time.Time
+
 const (
 	testDatabase       = "testDatabase.db"
 	remoteIP           = "192.168.178.84" // remote IP of compute for testing
@@ -539,6 +543,8 @@ func TestServer_CheckMultipleFunnels(t *testing.T) {
 
 // this test sends sphinx encrypted packets to servers and expects them to answer using a listener
 func TestServer_EndToEndStandalone(t *testing.T) {
+	totalPackets := 100 // sent per Client Thread
+	packetCountTest = totalPackets * threadsCountServer
 	go createTestTLSListener(t)
 
 	var connections = make([]net.Conn, threadsCountServer)
@@ -565,8 +571,9 @@ func TestServer_EndToEndStandalone(t *testing.T) {
 		testPackages[i] = bSphinxPacket
 	}
 
-	totalPackets := 1000 // sent per Client Thread
-	t.Log("Timestamp before sending starts : ", time.Now())
+	t.Log("Sending " + strconv.Itoa(threadsCountServer*totalPackets) + " packets.")
+	tsStart = time.Now()
+	t.Log("Timestamp before sending starts : ", tsStart)
 
 	//countPackets := 0
 	var waitgroup sync.WaitGroup
@@ -589,7 +596,10 @@ func TestServer_EndToEndStandalone(t *testing.T) {
 	waitgroup.Wait()
 	t.Log("Timestamp after the packets have all been sent: ", time.Now())
 	// sleep timer to keep listener alive
-	time.Sleep(15000000000)
+	for tsDone.IsZero() {
+		time.Sleep(time.Second * 3)
+	}
+	t.Log("From sending to reception of all " + strconv.Itoa(threadsCountServer*totalPackets) + " packets it took " + tsDone.Sub(tsStart).String() + ".")
 }
 
 // run only if the server accepts unencrypted packets
@@ -832,13 +842,14 @@ func createTestTLSListener(t *testing.T) error {
 					break
 				}
 
-				t.Log("Received: ", string(buf[:n]))
+				//t.Log("Received: ", string(buf[:n]))
 				//t.Log("Packet received: ", answer)
 				receivedPackets++
-				if receivedPackets == 980 {
-					t.Log("Received 980 packets at: ", time.Now())
+				if receivedPackets == packetCountTest {
+					tsDone = time.Now()
+					t.Log("Received all "+strconv.Itoa(packetCountTest)+" packets at: ", tsDone)
 				}
-				t.Log("Received packets: ", receivedPackets)
+				//t.Log("Received packets: ", receivedPackets)
 			}
 		}(someIndex)
 	}
