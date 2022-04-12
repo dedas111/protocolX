@@ -56,8 +56,10 @@ var anotherServer *Server
 var curve = elliptic.P224()
 
 const (
-	testDatabase = "testDatabase.db"
-	remoteIP     = "192.168.178.84" // remote IP of compute for testing
+	testDatabase       = "testDatabase.db"
+	remoteIP           = "192.168.178.84" // remote IP of compute for testing
+	threadsCountClient = 4                // listener threads on client
+	threadsCountServer = 4                // listener threads on compute/server
 )
 
 func createTestServer() (*Server, error) {
@@ -536,13 +538,12 @@ func TestServer_CheckMultipleFunnels(t *testing.T) {
 }
 
 // this test sends sphinx encrypted packets to servers and expects them to answer using a listener
-func TestServer_EndToEnd(t *testing.T) {
+func TestServer_EndToEndStandalone(t *testing.T) {
 	go createTestTLSListener(t)
 
-	threadsCount = 1
-	var connections = make([]net.Conn, threadsCount)
+	var connections = make([]net.Conn, threadsCountServer)
 
-	for i := 0; i < threadsCount; i++ {
+	for i := 0; i < threadsCountServer; i++ {
 		//t.Log("After the server starts")
 		fmt.Println("After the server starts")
 		port := 9900 + i // compute node acts as provider (takes client messages)
@@ -554,8 +555,8 @@ func TestServer_EndToEnd(t *testing.T) {
 		time.Sleep(30 * time.Millisecond)
 	}
 	initialListenPort := 50000
-	testPackages := make([][]byte, threadsCount)
-	for i := 0; i < threadsCount; i++ {
+	testPackages := make([][]byte, threadsCountServer)
+	for i := 0; i < threadsCountServer; i++ {
 		sphinxPacket := createStaticTestPacketWithPort(t, "hello world", strconv.Itoa(initialListenPort+i))
 		bSphinxPacket, err := proto.Marshal(sphinxPacket)
 		if err != nil {
@@ -564,12 +565,12 @@ func TestServer_EndToEnd(t *testing.T) {
 		testPackages[i] = bSphinxPacket
 	}
 
-	totalPackets := 100
+	totalPackets := 1000 // sent per Client Thread
 	t.Log("Timestamp before sending starts : ", time.Now())
 
 	//countPackets := 0
 	var waitgroup sync.WaitGroup
-	for j := 0; j < threadsCount; j++ {
+	for j := 0; j < threadsCountServer; j++ {
 		waitgroup.Add(1)
 		conn := connections[j]
 		go func(connection net.Conn, index int) {
@@ -610,7 +611,7 @@ func TestServer_Unencrypted(t *testing.T) {
 		time.Sleep(30 * time.Millisecond)
 	}
 
-	totalPackets := 100
+	totalPackets := 100 // sent per Client Thread
 	t.Log("Timestamp before sending starts : ", time.Now())
 
 	var waitgroup sync.WaitGroup
@@ -645,10 +646,9 @@ func TestServer_Unencrypted(t *testing.T) {
 func TestServer_EndToEndVariousPacket(t *testing.T) {
 	go createTestTLSListener(t)
 
-	threadsCount = 1
-	var connections = make([]net.Conn, threadsCount)
+	var connections = make([]net.Conn, threadsCountServer)
 
-	for i := 0; i < threadsCount; i++ {
+	for i := 0; i < threadsCountServer; i++ {
 		//t.Log("After the server starts")
 		fmt.Println("After the server starts")
 		port := 9900 + i // compute node acts as provider (takes client messages)
@@ -660,20 +660,20 @@ func TestServer_EndToEndVariousPacket(t *testing.T) {
 		time.Sleep(30 * time.Millisecond)
 	}
 
-	totalPackets := 1000
+	totalPackets := 100 // sent per Client Thread
 	t.Log("Timestamp before sending starts : ", time.Now())
 
 	//countPackets := 0
+	initialListenPort := 50000
 	var waitgroup sync.WaitGroup
-	for j := 0; j < threadsCount; j++ {
+	for j := 0; j < threadsCountServer; j++ {
 		waitgroup.Add(1)
 		conn := connections[j]
 		go func(connection net.Conn, index int) {
 			defer waitgroup.Done()
 			for i := 0; i < totalPackets; i++ {
 				//for countPackets < totalPackets {
-				initialListenPort := 50000
-				sphinxPacket := createStaticTestPacketWithPort(t, strconv.Itoa(i), strconv.Itoa(initialListenPort))
+				sphinxPacket := createStaticTestPacketWithPort(t, strconv.Itoa(i), strconv.Itoa(initialListenPort+i))
 				bSphinxPacket, err := proto.Marshal(sphinxPacket)
 				if err != nil {
 					t.Fatal(err)
@@ -793,14 +793,14 @@ func createTestTLSListener(t *testing.T) error {
 	ip, err := helpers.GetLocalIP()
 	initialListenPort := 50000
 
-	for someIndex := 0; someIndex < threadsCount; someIndex++ {
+	for someIndex := 0; someIndex < threadsCountClient; someIndex++ {
 		loopPort := strconv.Itoa(initialListenPort + someIndex)
 		listener, err := tls.Listen("tcp", ip+":"+loopPort, &config)
 		if err != nil {
 			t.Error("test: listen error: ", err)
 			panic(err)
 		}
-		t.Log("test: listening on port ", loopPort)
+		t.Log("test: listening on port:", loopPort)
 
 		go func(localIndex int) {
 			for {

@@ -330,6 +330,10 @@ func (p *Server) forwardPacketToFunnel(computePacket config.ComputePacket, funne
 	}
 
 	randPort := mrand.Int31n(int32(threadsCount - 1))
+	logLocal.Info("Server: Forwarding sphinx packet to funnel with id and port: ", funnelId, randPort)
+	if p.connections[funnelId][randPort] == nil {
+		time.Sleep(time.Millisecond * 30)
+	}
 	p.connections[funnelId][randPort].Write(packetBytes)
 	if err != nil {
 		return err
@@ -788,7 +792,6 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 			funnelId = 3
 		}
 
-	*/
 	// --- THIS HAS TO BE REMOVED AFTERWARDS ---
 
 	// use this for testing with only one funnel
