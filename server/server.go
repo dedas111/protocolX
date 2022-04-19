@@ -61,6 +61,7 @@ var (
 	staticServerRole = ""
 	lbCtr            = 0
 	emptyCtr         = 0
+	numOfFunnels     = 1
 
 	logLocal = logging.PackageLogger()
 )
@@ -332,7 +333,7 @@ func (p *Server) forwardPacketToFunnel(computePacket config.ComputePacket, funne
 	randPort := mrand.Int31n(int32(threadsCount - 1))
 	logLocal.Info("Server: Forwarding sphinx packet to funnel with id and port: ", funnelId, randPort)
 	if p.connections[funnelId][randPort] == nil {
-		time.Sleep(time.Millisecond * 30)
+		time.Sleep(time.Millisecond * 650)
 	}
 	p.connections[funnelId][randPort].Write(packetBytes)
 	if err != nil {
@@ -751,7 +752,7 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 	server.connections = make(map[int][]*tls.Conn)
 	server.connectionsToCompute = make(map[string]*tls.Conn)
 
-	threadsCount = runtime.NumCPU()
+	threadsCount = runtime.NumCPU() * 2
 	//logLocal.Info("Starting server with logical cores: ", threadsCount)
 
 	// prevent server from adding its config multiple times to database
@@ -784,18 +785,13 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 	//funnelId := list[randNumber]
 
 	// --- THIS HAS TO BE REMOVED AFTERWARDS ---
-	/*
-		funnelId := 0
-		if config.GetRound()%2 == 0 {
-			funnelId = 2
-		} else {
-			funnelId = 3
-		}
+
+	funnelId := int(config.GetRound()) % numOfFunnels
 
 	// --- THIS HAS TO BE REMOVED AFTERWARDS ---
 
 	// use this for testing with only one funnel
-	funnelId := 2
+	// funnelId := 2
 
 	// --- THIS HAS TO BE REMOVED AFTERWARDS ---
 
@@ -835,6 +831,7 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 		for i < threadsCount {
 			realPort := intPort + i
 			nodePort := strconv.Itoa(realPort)
+			//logLocal.Info("compute node: Trying to connect to funnel: ", nodeHost+":"+nodePort)
 			conn, err := tls.Dial("tcp", nodeHost+":"+nodePort, &config)
 			if err != nil {
 				logLocal.Info("compute node: dial: ", err)

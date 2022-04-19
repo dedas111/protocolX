@@ -62,8 +62,9 @@ var tsDone time.Time
 const (
 	testDatabase       = "testDatabase.db"
 	remoteIP           = "192.168.178.84" // remote IP of compute for testing
-	threadsCountClient = 4                // listener threads on client
-	threadsCountServer = 4                // listener threads on compute/server
+	localIP            = "192.168.178.84" // IP of the client receiving the packets for the tests
+	threadsCountClient = 4                // listener threads on client - has to be synced to threadsCountServer
+	threadsCountServer = 4                // listener threads on compute/server - has to be synced to threadsCountClient
 )
 
 func createTestServer() (*Server, error) {
@@ -990,8 +991,7 @@ func createStaticTestPacketWithPort(t *testing.T, payload string, port string) *
 		}
 
 	*/
-	ip := "192.168.178.84"
-	clientConfig := config.ClientConfig{Id: "1", Host: ip, Port: port, Provider: &localServer.config}
+	clientConfig := config.ClientConfig{Id: "1", Host: localIP, Port: port, Provider: &localServer.config}
 
 	// create packet
 	path := config.E2EPath{IngressProvider: computeConfig, Mixes: []config.MixConfig{computeConfig, computeConfig}, EgressProvider: computeConfig, Recipient: clientConfig}
