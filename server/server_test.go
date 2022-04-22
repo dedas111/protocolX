@@ -59,6 +59,8 @@ var packetCountTest int
 var tsStart time.Time
 var tsDone time.Time
 
+var listOfComputeIPs = [...]string{"1.2.3.4"}
+
 const (
 	testDatabase       = "testDatabase.db"
 	remoteIP           = "192.168.178.84" // remote IP of compute for testing
@@ -377,6 +379,40 @@ func createTlsConnection(port int, t *testing.T) net.Conn {
 	return conn
 }
 
+func createTlsConnectionToIndividual(ip string, port int, t *testing.T) net.Conn {
+	t.Log("Before client loadkeys")
+	cert, err := tls.LoadX509KeyPair("/home/olaf/certs/client.pem", "/home/olaf/certs/client.key")
+	if err != nil {
+		t.Log("server: loadkeys")
+		return nil
+	}
+	config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+	//conn, err := tls.Dial("tcp", "127.0.0.1:"+strconv.Itoa(port), &config)
+	conn, err := tls.Dial("tcp", ip+":"+strconv.Itoa(port), &config)
+	if conn == nil {
+		t.Log("Conn is nil")
+		// retunr nil
+	}
+	// defer conn.Close()
+	t.Log("client: connected to: ", conn.RemoteAddr())
+
+	state := conn.ConnectionState()
+	for _, v := range state.PeerCertificates {
+		fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
+		fmt.Println(v.Subject)
+	}
+	t.Log("client: handshake: ", state.HandshakeComplete)
+	t.Log("client: mutual: ", state.NegotiatedProtocolIsMutual)
+
+	// message := "Hello\n"
+	// n, err := io.WriteString(conn, message)
+	// if err != nil {
+	//     logLocal.Info("client: write: %s", err)
+	// }
+	// logLocal.Info("client: wrote %q (%d bytes)", message, n)
+	return conn
+}
+
 func TestServer_TlsConnectionReceive(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
@@ -545,54 +581,66 @@ func TestServer_CheckMultipleFunnels(t *testing.T) {
 // this test sends sphinx encrypted packets to servers and expects them to answer using a listener
 func TestServer_EndToEndStandalone(t *testing.T) {
 	totalPackets := 100 // sent per Client Thread
-	packetCountTest = totalPackets * threadsCountServer
+	packetCountTest = totalPackets * threadsCountServer * len(listOfComputeIPs)
 	go createTestTLSListener(t)
 
-	var connections = make([]net.Conn, threadsCountServer)
-
-	for i := 0; i < threadsCountServer; i++ {
-		//t.Log("After the server starts")
-		fmt.Println("After the server starts")
-		port := 9900 + i // compute node acts as provider (takes client messages)
-		connections[i] = createTlsConnection(port, t)
-		if connections[i] == nil {
-			t.Log("Conn is nil")
-		}
-		t.Log("After the TLS connection is established")
-		time.Sleep(30 * time.Millisecond)
+	// create connection slice and create slices for actual connections
+	var connections = make([][]net.Conn, len(listOfComputeIPs))
+	for i, _ := range connections {
+		connections[i] = make([]net.Conn, threadsCountServer)
 	}
+	for j, ip := range listOfComputeIPs {
+		for i := 0; i < threadsCountServer; i++ {
+			//t.Log("After the server starts")
+			fmt.Println("After the server starts")
+			port := 9900 + i // compute node acts as provider (takes client messages)
+			connections[j][i] = createTlsConnectionToIndividual(ip, port, t)
+			if connections[j][i] == nil {
+				t.Log("Conn is nil")
+			}
+			t.Log("After the TLS connection is established")
+			time.Sleep(30 * time.Millisecond)
+		}
+	}
+	// sending begins
 	initialListenPort := 50000
-	testPackages := make([][]byte, threadsCountServer)
-	for i := 0; i < threadsCountServer; i++ {
-		sphinxPacket := createStaticTestPacketWithPort(t, "hello world", strconv.Itoa(initialListenPort+i))
-		bSphinxPacket, err := proto.Marshal(sphinxPacket)
-		if err != nil {
-			t.Fatal(err)
-		}
-		testPackages[i] = bSphinxPacket
+	testPackages := make([][][]byte, len(listOfComputeIPs))
+	for i, _ := range testPackages {
+		testPackages[i] = make([][]byte, threadsCountServer)
 	}
-
-	t.Log("Sending " + strconv.Itoa(threadsCountServer*totalPackets) + " packets.")
+	for j, ip := range listOfComputeIPs {
+		for i := 0; i < threadsCountServer; i++ {
+			sphinxPacket := createStaticTestPacketWithPortForIndividual(t, "hello world", ip, strconv.Itoa(initialListenPort+i))
+			bSphinxPacket, err := proto.Marshal(sphinxPacket)
+			if err != nil {
+				t.Fatal(err)
+			}
+			testPackages[j][i] = bSphinxPacket
+		}
+	}
+	t.Log("Sending " + strconv.Itoa(threadsCountServer*totalPackets*len(listOfComputeIPs)) + " packets to " + strconv.Itoa(len(listOfComputeIPs)) + "compute nodes.")
 	tsStart = time.Now()
 	t.Log("Timestamp before sending starts : ", tsStart)
 
 	//countPackets := 0
 	var waitgroup sync.WaitGroup
-	for j := 0; j < threadsCountServer; j++ {
-		waitgroup.Add(1)
-		conn := connections[j]
-		go func(connection net.Conn, index int) {
-			defer waitgroup.Done()
-			for i := 0; i < totalPackets; i++ {
-				//for countPackets < totalPackets {
-				_, err := connection.Write(testPackages[index])
-				if err != nil {
-					t.Log("There is an error : ", err)
+	for k, _ := range listOfComputeIPs {
+		for j := 0; j < threadsCountServer; j++ {
+			waitgroup.Add(1)
+			conn := connections[k][j]
+			go func(connection net.Conn, computeIndex int, testPacketIndex int) {
+				defer waitgroup.Done()
+				for i := 0; i < totalPackets; i++ {
+					//for countPackets < totalPackets {
+					_, err := connection.Write(testPackages[computeIndex][testPacketIndex])
+					if err != nil {
+						t.Log("There is an error : ", err)
+					}
+					//countPackets++
+					//t.Log(countPackets)
 				}
-				//countPackets++
-				//t.Log(countPackets)
-			}
-		}(conn, j)
+			}(conn, k, j)
+		}
 	}
 	waitgroup.Wait()
 	t.Log("Timestamp after the packets have all been sent: ", time.Now())
@@ -600,7 +648,7 @@ func TestServer_EndToEndStandalone(t *testing.T) {
 	for tsDone.IsZero() {
 		time.Sleep(time.Second * 3)
 	}
-	t.Log("From sending to reception of all " + strconv.Itoa(threadsCountServer*totalPackets) + " packets it took " + tsDone.Sub(tsStart).String() + ".")
+	t.Log("From sending to reception of all " + strconv.Itoa(threadsCountServer*totalPackets*len(listOfComputeIPs)) + " packets it took " + tsDone.Sub(tsStart).String() + ".")
 }
 
 // run only if the server accepts unencrypted packets
@@ -957,25 +1005,6 @@ func createTestPacketForDynamicFunnels(t *testing.T, payload string) *sphinx.Sph
 }
 
 func createStaticTestPacketWithPort(t *testing.T, payload string, port string) *sphinx.SphinxPacket {
-	/*
-		db, err := pki.OpenDatabase("/home/olaf/GolandProjects/protocolX/"+PKI_DIR, "sqlite3")
-		if err != nil {
-			panic(err)
-		}
-
-		// create config for compute node
-		row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", "1", "Provider")
-
-		var results []byte
-		err = row.Scan(&results)
-		if err != nil {
-			fmt.Println(err)
-		}
-		var computeConfig config.MixConfig
-		err = proto.Unmarshal(results, &computeConfig)
-		/*
-
-	*/
 	var computeConfig config.MixConfig
 	pubP, _ := os.ReadFile("/home/olaf/GolandProjects/protocolX/pki/pubP")
 	computeConfig.Id = "1"
@@ -983,14 +1012,26 @@ func createStaticTestPacketWithPort(t *testing.T, payload string, port string) *
 	computeConfig.Host = remoteIP
 	computeConfig.PubKey = pubP
 
-	// create ClientConfig for recipient
-	/*
-		ip, err := helpers.GetLocalIP()
-		if err != nil {
-			panic(err)
-		}
+	clientConfig := config.ClientConfig{Id: "1", Host: localIP, Port: port, Provider: &localServer.config}
 
-	*/
+	// create packet
+	path := config.E2EPath{IngressProvider: computeConfig, Mixes: []config.MixConfig{computeConfig, computeConfig}, EgressProvider: computeConfig, Recipient: clientConfig}
+	sphinxPacket, err := sphinx.PackForwardMessage(curve, path, []float64{0.1, 0.2, 0.3, 0.1, 0.2, 0.1}, payload)
+	if err != nil {
+		t.Fatal(err)
+		return nil
+	}
+	return &sphinxPacket
+}
+
+func createStaticTestPacketWithPortForIndividual(t *testing.T, payload string, ip string, port string) *sphinx.SphinxPacket {
+	var computeConfig config.MixConfig
+	pubP, _ := os.ReadFile("/home/olaf/GolandProjects/protocolX/pki/pubP")
+	computeConfig.Id = "1"
+	computeConfig.Port = "9900"
+	computeConfig.Host = ip
+	computeConfig.PubKey = pubP
+
 	clientConfig := config.ClientConfig{Id: "1", Host: localIP, Port: port, Provider: &localServer.config}
 
 	// create packet
