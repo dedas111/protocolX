@@ -70,6 +70,8 @@ const (
 	PKI_DIR = "pki/database.db"
 	// TODO: make this dynamic for example with cmdline parameters (only needed for randomness beacon, remove if changed to other randomness beacon)
 	globalNodeCount = 3
+	computeThreads  = 4
+	funnelThreads   = 8
 )
 
 type ProviderIt interface {
@@ -330,7 +332,7 @@ func (p *Server) forwardPacketToFunnel(computePacket config.ComputePacket, funne
 		return err
 	}
 
-	randPort := mrand.Int31n(int32(threadsCount - 1))
+	randPort := mrand.Int31n(int32(funnelThreads - 1))
 	logLocal.Info("Server: Forwarding sphinx packet to funnel with id and port: ", funnelId, randPort)
 	if p.connections[funnelId][randPort] == nil {
 		time.Sleep(time.Millisecond * 650)
@@ -428,6 +430,7 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 		logLocal.WithError(err)
 	}
 	// experimental loadbalancing here - use different destination ports for relay
+	// if only changing ports in test computeConfigs this will not change anything here
 	//logLocal.Info("Address to be processed: ", computePacket.NextHop)
 	if len(computePacket.NextHop) == 0 {
 		//logLocal.Info("Empty next hop! Not relaying!")
@@ -447,7 +450,7 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 	if nextHopPortInt < 10000 && nextHopPortInt >= 9900 { // hardcoded portrange for protocol for now
 		dstAddr := dstIp + strconv.Itoa(nextHopPortInt+lbCtr)
 		// for this to work, every server has to have the same amount of threads
-		lbCtr = (lbCtr + 1) % threadsCount
+		lbCtr = (lbCtr + 1) % computeThreads
 
 		// save connection to map if it doesn't exist
 		conn, pres := p.connectionsToCompute[dstAddr]
