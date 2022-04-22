@@ -97,7 +97,7 @@ type Server struct {
 	indexSinceLastRelay []int // used by funnel to determine which packets are new
 
 	connections          map[int][]*tls.Conn  // TLS connection to funnels
-	connectionsToCompute map[string]*tls.Conn // TLS connection to funnels
+	connectionsToCompute map[string]*tls.Conn // TLS connection to compute nodes
 }
 
 type ClientRecord struct {
@@ -437,15 +437,15 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 		return
 	}
 	dstIp := strings.SplitAfter(computePacket.NextHop, ":")[0]
-	dbPort := strings.SplitAfter(computePacket.NextHop, ":")[1]
+	nextHopPort := strings.SplitAfter(computePacket.NextHop, ":")[1]
 
-	dbPortInt, err := strconv.Atoi(dbPort)
+	nextHopPortInt, err := strconv.Atoi(nextHopPort)
 	if err != nil {
 		logLocal.Error("Couldn't read port from packet to relay!", err)
 	}
 
-	if dbPortInt < 10000 && dbPortInt >= 9900 { // hardcoded portrange for protocol for now
-		dstAddr := dstIp + strconv.Itoa(dbPortInt+lbCtr)
+	if nextHopPortInt < 10000 && nextHopPortInt >= 9900 { // hardcoded portrange for protocol for now
+		dstAddr := dstIp + strconv.Itoa(nextHopPortInt+lbCtr)
 		// for this to work, every server has to have the same amount of threads
 		lbCtr = (lbCtr + 1) % threadsCount
 
