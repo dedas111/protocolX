@@ -122,6 +122,8 @@ func main() {
 	providerId := flag.String("provider", "", "The provider for the client")
 	// clientType := flag.String("clientType", "", "If the client is a sender/recipient")
 	staticRole := flag.String("staticRole", "", "Debug flag to set server to compute or funnel functionality")
+	computeListenerCount := flag.String("computeListenerCount", "", "amount of listeners provided by compute") // added for testing in AWS
+	funnelListenerCount := flag.String("funnelListenerCount", "", "amount of listeners provided by funnel")    // added for testing in AWS
 	flag.Parse()
 
 	err := pkiPreSetting(PKI_DIR)
@@ -186,7 +188,7 @@ func main() {
 			panic(err)
 		}
 
-		mixServer, err := server.NewServer(*id, *host, *port, pubM, privM, PKI_DIR, *staticRole)
+		mixServer, err := server.NewServer(*id, *host, *port, pubM, privM, PKI_DIR, *staticRole, *computeListenerCount, *funnelListenerCount)
 		if err != nil {
 			panic(err)
 		}
@@ -195,10 +197,10 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-	case "provider":
 
-		threads := runtime.GOMAXPROCS(0) - 2
-		logLocal.Info("main: case provider: the total number of threads used : ", threads)
+	case "provider":
+		//threads := runtime.GOMAXPROCS(0) - 2
+		//logLocal.Info("main: case provider: the total number of threads used : ", threads)
 
 		//os.WriteFile("/home/olaf/GolandProjects/pubP", pubP, 0644)
 		logLocal.Info("Trying to use local serverkeys...")
@@ -217,7 +219,7 @@ func main() {
 		}
 
 		///logLocal.Info("Saving IP to database: ", *host)
-		providerServer, err := server.NewServer(*id, *host, *port, pubP, privP, PKI_DIR, *staticRole)
+		providerServer, err := server.NewServer(*id, *host, *port, pubP, privP, PKI_DIR, *staticRole, *computeListenerCount, *funnelListenerCount)
 		if err != nil {
 			panic(err)
 		}

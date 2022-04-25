@@ -62,6 +62,8 @@ var (
 	lbCtr            = 0
 	emptyCtr         = 0
 	numOfFunnels     = 1
+	computeListeners = 4
+	funnelListeners  = 16
 
 	logLocal = logging.PackageLogger()
 )
@@ -70,8 +72,6 @@ const (
 	PKI_DIR = "pki/database.db"
 	// TODO: make this dynamic for example with cmdline parameters (only needed for randomness beacon, remove if changed to other randomness beacon)
 	globalNodeCount = 3
-	computeThreads  = 4
-	funnelThreads   = 8
 )
 
 type ProviderIt interface {
@@ -332,7 +332,7 @@ func (p *Server) forwardPacketToFunnel(computePacket config.ComputePacket, funne
 		return err
 	}
 
-	randPort := mrand.Int31n(int32(funnelThreads - 1))
+	randPort := mrand.Int31n(int32(funnelListeners - 1))
 	logLocal.Info("Server: Forwarding sphinx packet to funnel with id and port: ", funnelId, randPort)
 	if p.connections[funnelId][randPort] == nil {
 		time.Sleep(time.Millisecond * 650)
@@ -450,7 +450,7 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 	if nextHopPortInt < 10000 && nextHopPortInt >= 9900 { // hardcoded portrange for protocol for now
 		dstAddr := dstIp + strconv.Itoa(nextHopPortInt+lbCtr)
 		// for this to work, every server has to have the same amount of threads
-		lbCtr = (lbCtr + 1) % computeThreads
+		lbCtr = (lbCtr + 1) % computeListeners
 
 		// save connection to map if it doesn't exist
 		conn, pres := p.connectionsToCompute[dstAddr]
@@ -746,8 +746,10 @@ func (p *Server) authenticateUser(clientId string, clientToken []byte) bool {
 
 // NewServer constructs a new server object.
 // NewServer returns a new server object and an error.
-func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string, staticRole string) (*Server, error) {
+func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string, staticRole string, computeListenerCount string, funnelListenerCount string) (*Server, error) {
 	staticServerRole = staticRole
+	computeListeners, _ = strconv.Atoi(computeListenerCount)
+	funnelListeners, _ = strconv.Atoi(funnelListenerCount)
 	node := node.NewMix(pubKey, prvKey)
 	server := Server{id: id, host: host, port: port, Mix: node, listener: nil}
 	server.config = config.MixConfig{Id: server.id, Host: server.host, Port: server.port, PubKey: server.GetPublicKey()}

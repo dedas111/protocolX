@@ -360,16 +360,16 @@ func createTlsConnection(port int, t *testing.T) net.Conn {
 		// retunr nil
 	}
 	// defer conn.Close()
-	t.Log("client: connected to: ", conn.RemoteAddr())
-
-	state := conn.ConnectionState()
-	for _, v := range state.PeerCertificates {
-		fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
-		fmt.Println(v.Subject)
-	}
-	t.Log("client: handshake: ", state.HandshakeComplete)
-	t.Log("client: mutual: ", state.NegotiatedProtocolIsMutual)
-
+	fmt.Println("client: connected to: ", conn.RemoteAddr())
+	/*
+		state := conn.ConnectionState()
+		for _, v := range state.PeerCertificates {
+			fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
+			fmt.Println(v.Subject)
+		}
+		t.Log("client: handshake: ", state.HandshakeComplete)
+		t.Log("client: mutual: ", state.NegotiatedProtocolIsMutual)
+	*/
 	// message := "Hello\n"
 	// n, err := io.WriteString(conn, message)
 	// if err != nil {
@@ -401,8 +401,8 @@ func createTlsConnectionToIndividual(ip string, port int, t *testing.T) net.Conn
 		fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
 		fmt.Println(v.Subject)
 	}
-	t.Log("client: handshake: ", state.HandshakeComplete)
-	t.Log("client: mutual: ", state.NegotiatedProtocolIsMutual)
+	//fmt.Println("client: handshake: ", state.HandshakeComplete)
+	//fmt.Println("client: mutual: ", state.NegotiatedProtocolIsMutual)
 
 	// message := "Hello\n"
 	// n, err := io.WriteString(conn, message)
@@ -592,7 +592,7 @@ func TestServer_EndToEndStandalone(t *testing.T) {
 	for j, ip := range listOfComputeIPs {
 		for i := 0; i < threadsCountServer; i++ {
 			//t.Log("After the server starts")
-			fmt.Println("After the server starts")
+			//fmt.Println("After the server starts")
 			port := 9900 + i // compute node acts as provider (takes client messages)
 			connections[j][i] = createTlsConnectionToIndividual(ip, port, t)
 			if connections[j][i] == nil {
@@ -618,9 +618,9 @@ func TestServer_EndToEndStandalone(t *testing.T) {
 			testPackages[j][i] = bSphinxPacket
 		}
 	}
-	t.Log("Sending " + strconv.Itoa(threadsCountServer*totalPackets*len(listOfComputeIPs)) + " packets to " + strconv.Itoa(len(listOfComputeIPs)) + "compute nodes.")
+	fmt.Println("Sending " + strconv.Itoa(threadsCountServer*totalPackets*len(listOfComputeIPs)) + " packets to " + strconv.Itoa(len(listOfComputeIPs)) + "compute nodes.")
 	tsStart = time.Now()
-	t.Log("Timestamp before sending starts : ", tsStart)
+	fmt.Println("Timestamp before sending starts : ", tsStart)
 
 	//countPackets := 0
 	var waitgroup sync.WaitGroup
@@ -643,12 +643,12 @@ func TestServer_EndToEndStandalone(t *testing.T) {
 		}
 	}
 	waitgroup.Wait()
-	t.Log("Timestamp after the packets have all been sent: ", time.Now())
+	fmt.Println("Timestamp after the packets have all been sent: ", time.Now())
 	// sleep timer to keep listener alive
 	for tsDone.IsZero() {
 		time.Sleep(time.Second * 3)
 	}
-	t.Log("From sending to reception of all " + strconv.Itoa(threadsCountServer*totalPackets*len(listOfComputeIPs)) + " packets it took " + tsDone.Sub(tsStart).String() + ".")
+	fmt.Println("From sending to reception of all " + strconv.Itoa(threadsCountServer*totalPackets*len(listOfComputeIPs)) + " packets it took " + tsDone.Sub(tsStart).String() + ".")
 }
 
 // run only if the server accepts unencrypted packets
@@ -894,11 +894,14 @@ func createTestTLSListener(t *testing.T) error {
 				//t.Log("Received: ", string(buf[:n]))
 				//t.Log("Packet received: ", answer)
 				receivedPackets++
+				if receivedPackets == int(float32(packetCountTest)*0.9) {
+					fmt.Println("Received 90% of all "+strconv.Itoa(packetCountTest)+" packets at: ", time.Now())
+				}
 				if receivedPackets == packetCountTest {
 					tsDone = time.Now()
-					t.Log("Received all "+strconv.Itoa(packetCountTest)+" packets at: ", tsDone)
+					fmt.Println("Received all "+strconv.Itoa(packetCountTest)+" packets at: ", tsDone)
 				}
-				//t.Log("Received packets: ", receivedPackets)
+				//fmt.Println("Received packets: ", receivedPackets)
 			}
 		}(someIndex)
 	}
