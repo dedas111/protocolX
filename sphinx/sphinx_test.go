@@ -16,6 +16,7 @@ package sphinx
 
 import (
 	"github.com/dedas111/protocolX/config"
+	"time"
 
 	"crypto/aes"
 	"crypto/elliptic"
@@ -403,8 +404,10 @@ func TestProcessSphinxHeader(t *testing.T) {
 
 	header := Header{sharedSecrets[0].Alpha, enc_expectedRouting, mac3}
 
+	tsStart := time.Now()
 	nextHop, newCommands, newHeader, err := ProcessSphinxHeader(header, priv1)
-
+	tsDone := time.Now()
+	fmt.Println("Processing header took " + tsDone.Sub(tsStart).String() + ".")
 	if err != nil {
 		t.Error(err)
 	}
@@ -447,12 +450,15 @@ func TestProcessSphinxPayload(t *testing.T) {
 
 	decMsg = encMsg
 	privs := [][]byte{priv1, priv2, priv3}
+	tsStart := time.Now()
 	for i, v := range privs {
 		decMsg, err = ProcessSphinxPayload(asb[i].Alpha, decMsg, v)
 		if err != nil {
 			t.Error(err)
 		}
 	}
+	tsDone := time.Now()
+	fmt.Println("Processing payload took " + tsDone.Sub(tsStart).String() + ".")
 	assert.Equal(t, []byte(message), decMsg)
 }
 
