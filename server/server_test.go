@@ -63,10 +63,10 @@ var listOfComputeIPs = [...]string{"1.2.3.4"}
 
 const (
 	testDatabase       = "testDatabase.db"
-	remoteIP           = "192.168.178.84" // remote IP of compute for testing
+	remoteIP           = "192.168.178.84" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
 	localIP            = "192.168.178.84" // IP of the client receiving the packets for the tests
-	threadsCountClient = 4                // listener threads on client - has to be synced to threadsCountServer
-	threadsCountServer = 4                // listener threads on compute/server - has to be synced to threadsCountClient
+	threadsCountClient = 4                // listener threads on client
+	threadsCountServer = 4                // listener threads on compute/server
 )
 
 func createTestServer() (*Server, error) {
@@ -609,7 +609,7 @@ func TestServer_EndToEndStandalone(t *testing.T) {
 		testPackages[i] = make([][]byte, threadsCountServer)
 	}
 	for j, ip := range listOfComputeIPs {
-		for i := 0; i < threadsCountServer; i++ {
+		for i := 0; i < threadsCountClient; i++ {
 			sphinxPacket := createStaticTestPacketWithPortForIndividual(t, "hello world", ip, strconv.Itoa(initialListenPort+i))
 			bSphinxPacket, err := proto.Marshal(sphinxPacket)
 			if err != nil {
@@ -618,7 +618,7 @@ func TestServer_EndToEndStandalone(t *testing.T) {
 			testPackages[j][i] = bSphinxPacket
 		}
 	}
-	fmt.Println("Sending " + strconv.Itoa(threadsCountServer*totalPackets*len(listOfComputeIPs)) + " packets to " + strconv.Itoa(len(listOfComputeIPs)) + "compute nodes.")
+	fmt.Println("Sending " + strconv.Itoa(threadsCountServer*totalPackets*len(listOfComputeIPs)) + " packets to " + strconv.Itoa(len(listOfComputeIPs)) + " compute nodes.")
 	tsStart = time.Now()
 	fmt.Println("Timestamp before sending starts : ", tsStart)
 
@@ -859,7 +859,7 @@ func createTestTLSListener(t *testing.T) error {
 			t.Error("test: listen error: ", err)
 			panic(err)
 		}
-		t.Log("test: listening on port:", loopPort)
+		fmt.Println("test: listening on port:", loopPort)
 
 		go func(localIndex int) {
 			for {

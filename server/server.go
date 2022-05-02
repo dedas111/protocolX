@@ -829,11 +829,11 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 
 		nodeHost := mixConfig.Host
 		intPort, _ := strconv.Atoi(mixConfig.Port)
-		p.connections[funnelId] = make([]*tls.Conn, threadsCount)
+		p.connections[funnelId] = make([]*tls.Conn, funnelListeners)
 
 		// open connection with every available port for multithreading the ingress of funnel nodes
 		i := 0
-		for i < threadsCount {
+		for i < funnelListeners {
 			realPort := intPort + i
 			nodePort := strconv.Itoa(realPort)
 			//logLocal.Info("compute node: Trying to connect to funnel: ", nodeHost+":"+nodePort)
