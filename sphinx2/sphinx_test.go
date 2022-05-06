@@ -41,7 +41,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestExpoSingleValue(t *testing.T) {
-	priv, pub, err := box.GenerateKey(Reader)
+	_, pub, err := box.GenerateKey(Reader)
 
 	if err != nil {
 		t.Error(err)
@@ -57,19 +57,19 @@ func TestExpoSingleValue(t *testing.T) {
 
 	fmt.Println("Timestamp after exponentiation: ", time.Now())
 
-	_, x, y, err := elliptic.GenerateKey(curve, rand.Reader)
+	// _, x, y, err := elliptic.GenerateKey(curve, rand.Reader)
 
-	if err != nil {
-		t.Error(err)
-	}
+	// if err != nil {
+	// 	t.Error(err)
+	// }
 
-	fmt.Println("Timestamp before marshalling: ", time.Now())
+	// fmt.Println("Timestamp before marshalling: ", time.Now())
 	
-	randomPoint := elliptic.Marshal(curve, x, y)
+	// randomPoint := elliptic.Marshal(curve, x, y)
 
-	fmt.Println("Timestamp before second exponentiation: ", time.Now())
-	expectedX, expectedY := curve.ScalarMult(x, y, nBig.Bytes())
-	fmt.Println("Timestamp after second exponentiation: ", time.Now())
+	// fmt.Println("Timestamp before second exponentiation: ", time.Now())
+	// expectedX, expectedY := curve.ScalarMult(x, y, nBig.Bytes())
+	// fmt.Println("Timestamp after second exponentiation: ", time.Now())
 	
 	// assert.Equal(t, elliptic.Marshal(curve, expectedX, expectedY), result)
 
