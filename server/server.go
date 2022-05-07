@@ -19,13 +19,14 @@ import (
 	"github.com/dedas111/protocolX/helpers"
 	"github.com/dedas111/protocolX/networker"
 	"github.com/dedas111/protocolX/node"
+
 	// "github.com/dedas111/protocolX/sphinx"
 	"github.com/dedas111/protocolX/logging"
 
 	"github.com/golang/protobuf/proto"
 
 	"crypto/rand"
-    "crypto/tls"
+	"crypto/tls"
 	"crypto/x509"
 
 	// "bytes"
@@ -47,11 +48,11 @@ var (
 	tokenFlag  = []byte{0xa9}
 	pullFlag   = []byte{0xff}
 	// handledPackets = 0
-	relayedPackets = 0
+	relayedPackets   = 0
 	messageDelivered = 0
-	isMapper = true
+	isMapper         = true
 	// runningIndex = 0
-	msgCount = 100000
+	msgCount     = 100000
 	threadsCount = 100
 
 	logLocal = logging.PackageLogger()
@@ -73,11 +74,11 @@ type Server struct {
 
 	assignedClients map[string]ClientRecord
 	config          config.MixConfig
-	
-	aPac []node.MixPacket
+
+	aPac            []node.MixPacket
 	receivedPackets [][][]byte
-	mutex sync.Mutex
-	runningIndex []int
+	mutex           sync.Mutex
+	runningIndex    []int
 }
 
 type ClientRecord struct {
@@ -98,7 +99,7 @@ func (p *Server) Start() error {
 		p.runningIndex[i] = 0
 	}
 
-	p.receivedPackets = make([][][] byte, threadsCount)
+	p.receivedPackets = make([][][]byte, threadsCount)
 	for i := 0; i < threadsCount; i++ {
 		p.receivedPackets[i] = make([][]byte, msgCount)
 	}
@@ -130,7 +131,7 @@ func (p *Server) run() {
 		logLocal.Infof("Server: Preparing for relaying")
 		p.relayPacket()
 	}()
-	
+
 	<-finish
 }
 
@@ -251,14 +252,14 @@ func (p *Server) send(packet []byte, address string) error {
 // is logged into the log files, but the function is not stopped
 func (p *Server) listenForIncomingConnections() {
 	var wg sync.WaitGroup
-	for i:=0; i<180; i++ {
+	for i := 0; i < 180; i++ {
 		wg.Add(1)
 		conn, err := p.listener.Accept()
 
 		if err != nil {
 			logLocal.WithError(err).Error(err)
 			return
-		} 
+		}
 		go func() {
 			// logLocal.Infof("Server: Received new connection from %s", conn.RemoteAddr())
 			// logLocal.Info("Server: Current round number : ", config.GetRound())
@@ -271,7 +272,7 @@ func (p *Server) listenForIncomingConnections() {
 		}()
 	}
 	wg.Wait()
-	logLocal.Info("Server: packets processing done at round : ", config.GetRound() )
+	logLocal.Info("Server: packets processing done at round : ", config.GetRound())
 	// logLocal.Info("Server: Total packets processed : ", handledPackets )
 }
 
@@ -300,13 +301,13 @@ func (p *Server) relayPacket() error {
 }
 
 func (p *Server) startTlsServer() error {
-    cert, err := tls.LoadX509KeyPair("/home/das48/certs2/server.pem", "/home/das48/certs2/server.key")
-    if err != nil {
-        // log.Fatalf("server: loadkeys: %s", err)
+	cert, err := tls.LoadX509KeyPair("/home/debajyoti/certs2/server.pem", "/home/debajyoti/certs2/server.key")
+	if err != nil {
+		// log.Fatalf("server: loadkeys: %s", err)
 		logLocal.Info("server: loadkeys: ", err)
 		return err
-    }
-    config := tls.Config{Certificates: []tls.Certificate{cert}}
+	}
+	config := tls.Config{Certificates: []tls.Certificate{cert}}
 
 	// someIndex := 0
 	for someIndex := 0; someIndex < threadsCount; someIndex++ {
@@ -347,24 +348,24 @@ func (p *Server) startTlsServer() error {
 }
 
 func (p *Server) handleClient(conn net.Conn, someIndex int) {
-    // defer conn.Close()
-    buf := make([]byte, 1024)
-    for {
-        // logLocal.Info("server: conn: waiting")
-        n, err := conn.Read(buf)
-        if err != nil {
-        	logLocal.Info("server: conn: read: ", err)
-            break
-        }
+	// defer conn.Close()
+	buf := make([]byte, 1024)
+	for {
+		// logLocal.Info("server: conn: waiting")
+		n, err := conn.Read(buf)
+		if err != nil {
+			logLocal.Info("server: conn: read: ", err)
+			break
+		}
 
-        // logLocal.Info("server: conn: echo %q\n", string(buf[:n]))
-        // n, err = conn.Write(buf[:n])
-        // n, err = conn.Write(buf[:n])
-        // logLocal.Info("server: conn: wrote %d bytes", n)
-        // if err != nil {
-        //     logLocal.Info("server: write: %s", err)
-        //     break
-        // }
+		// logLocal.Info("server: conn: echo %q\n", string(buf[:n]))
+		// n, err = conn.Write(buf[:n])
+		// n, err = conn.Write(buf[:n])
+		// logLocal.Info("server: conn: wrote %d bytes", n)
+		// if err != nil {
+		//     logLocal.Info("server: write: %s", err)
+		//     break
+		// }
 
 		// var packet SphinxPacket
 		// err = proto.Unmarshal(buf[:n], &packet)
@@ -398,11 +399,11 @@ func (p *Server) handleClient(conn net.Conn, someIndex int) {
 		// 	logLocal.Info("Server: Packet flag not recognised. Packet dropped")
 		// 	return nil
 		// }
-    }
-    logLocal.Info("server: conn: closed")
+	}
+	logLocal.Info("server: conn: closed")
 }
 
-/* // not required now... 
+/* // not required now...
 func (p *Server) createTlsConnection() {
     cert, err := tls.LoadX509KeyPair("certs/client.pem", "certs/client.key")
     if err != nil {
@@ -513,7 +514,7 @@ func (p *Server) registerNewClient(clientBytes []byte) ([]byte, string, error) {
 
 	return token, address, nil
 }
- 
+
 // Function is responsible for handling the registration request from the client.
 // it registers the client in the list of all registered clients and send
 // an authentication token back to the client.
@@ -535,7 +536,6 @@ func (p *Server) handleAssignRequest(packet []byte) error {
 	}
 	return nil
 } */
-
 
 /* // AuthenticateUser compares the authentication token received from the client with
 // the one stored by the provider. If tokens are the same, it returns true
