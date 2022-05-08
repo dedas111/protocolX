@@ -10,7 +10,6 @@ require (
 	github.com/mattn/go-sqlite3 v1.5.0
 	github.com/sirupsen/logrus v1.7.1-0.20200930112625-d131c24e23ba
 	github.com/stretchr/testify v1.2.2
-	golang.org/x/net v0.0.0-20171212005608-d866cfc389ce // indirect
-	golang.org/x/sys v0.0.0-20200917073148-efd3b9a0ff20 // indirect
+	golang.org/x/crypto v0.0.0-20220507011949-2cf3adece122 // indirect
 	google.golang.org/protobuf v1.23.0
 )

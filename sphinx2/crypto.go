@@ -17,16 +17,18 @@ package sphinx2
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/elliptic"
+	// "crypto/elliptic"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/ed25519"
-	"golang.org/x/crypto/curve25519"
+	// "crypto/ed25519"
+	Curve "golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/nacl/box"
 
 	"math/big"
 )
+
+var P = big.NewInt(0).Sub(big.NewInt(0).Exp(big.NewInt(2), big.NewInt(255), nil), big.NewInt(19))
 
 func AES_CTR(key, plaintext []byte) ([]byte, error) {
 
@@ -63,44 +65,51 @@ func Hmac(key, message []byte) []byte {
 }
 
 func GenerateKeyPair() ([]byte, []byte, error) {
-	priv, pub, err := box.GenerateKey(Reader)
+	priv, pub, err := box.GenerateKey(rand.Reader)
 
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return pub, priv, nil
+	return pub[:], priv[:], nil
 }
 
 func KDF(key []byte) []byte {
 	return hash(key)[:K]
 }
 
-func bytesToBigNum(modulo big.Int, value []byte) *big.Int {
+func bytesToBigNum(value []byte) *big.Int {
 	nBig := new(big.Int)
 	nBig.SetBytes(value)
 
-	return new(big.Int).Mod(nBig, modulo)
+	return new(big.Int).Mod(nBig, P)
 }
 
-func randomBigInt(modulo big.Int) (big.Int, error) {
-	nBig, err := rand.Int(rand.Reader, modulo)
+func randomBigInt() (big.Int, error) {
+	nBig, err := rand.Int(rand.Reader, P)
 	if err != nil {
 		return big.Int{}, err
 	}
 	return *nBig, nil
 }
 
-func expo(base, exp []big.Int) []byte {
+func expo(base []byte, exp []big.Int) []byte {
 	x := exp[0]
 	for _, val := range exp[1:] {
 		x = *big.NewInt(0).Mul(&x, &val)
 	}
 
-	return X25519(x.Bytes(), base)
 	// baseX, baseY := elliptic.Unmarshal(elliptic.P224(), base)
 	// resultX, resultY := curve.Params().ScalarMult(baseX, baseY, x.Bytes())
 	// return elliptic.Marshal(curve, resultX, resultY)
+
+	s, err := Curve.X25519(x.Bytes(), base)
+
+	if err != nil {
+		logLocal.WithError(err).Error("Error in ProcessSphinxPacket - Group operation failed, probably invalid base.")
+		return nil
+	}
+	return s
 }
 
 func expoGroupBase(exp []big.Int) []byte {
@@ -110,10 +119,15 @@ func expoGroupBase(exp []big.Int) []byte {
 		x = *big.NewInt(0).Mul(&x, &val)
 	}
 
-	return X25519(x.Bytes(), Basepoint)
+	s, err := Curve.X25519(x.Bytes(), Curve.Basepoint)
 	// resultX, resultY := curve.Params().ScalarBaseMult(x.Bytes())
 	// return elliptic.Marshal(curve, resultX, resultY)
-
+	if err != nil {
+		logLocal.WithError(err).Error("Error in ProcessSphinxPacket - Group operation failed, probably invalid base.")
+		return nil
+	}
+	
+	return s
 }
 
 func computeMac(key, data []byte) []byte {

@@ -15,17 +15,17 @@
 package sphinx2
 
 import (
-	"github.com/dedas111/protocolX/config"
+	// "github.com/dedas111/protocolX/config"
 	"time"
 
-	"crypto/aes"
+	// "crypto/aes"
 	"crypto/elliptic"
 	"crypto/rand"
 
-	"golang.org/x/crypto/curve25519"
+	// "golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/nacl/box"
 
-	"github.com/golang/protobuf/proto"
+	// "github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 
 	"fmt"
@@ -41,21 +41,24 @@ func TestMain(m *testing.M) {
 }
 
 func TestExpoSingleValue(t *testing.T) {
-	_, pub, err := box.GenerateKey(Reader)
+	priv, pub, err := box.GenerateKey(rand.Reader)
 
 	if err != nil {
 		t.Error(err)
 	}
 
 	// randomPoint := elliptic.Marshal(curve, x, y)
-	nBig := *big.NewInt(200000)
-	exp := []big.Int{nBig}
+	// nBig := *big.NewInt(200000)
+	// exp := []big.Int{nBig}
 
 	fmt.Println("Timestamp before exponentiation: ", time.Now())
 
-	result := expo(pub, exp)
+	pubB := pub[:]
+	privB := priv[:]
+	expo(pubB, privB)
 
 	fmt.Println("Timestamp after exponentiation: ", time.Now())
+	fmt.Println("The scalar factor: ", priv)
 
 	// _, x, y, err := elliptic.GenerateKey(curve, rand.Reader)
 
@@ -74,3 +77,24 @@ func TestExpoSingleValue(t *testing.T) {
 	// assert.Equal(t, elliptic.Marshal(curve, expectedX, expectedY), result)
 
 }
+
+func TestHash(t *testing.T) {
+	_, x, err := GenerateKeyPair()
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	// randomPoint := elliptic.Marshal(curve, x, y)
+	hVal := hash(x)
+
+	assert.Equal(t, 32, len(hVal))
+
+}
+
+func TestBytesToBigNum(t *testing.T) {
+	bytes := big.NewInt(100).Bytes()
+	result := *bytesToBigNum(bytes)
+	assert.Equal(t, *big.NewInt(100), result)
+}
+

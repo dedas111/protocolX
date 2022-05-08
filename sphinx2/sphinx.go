@@ -23,8 +23,8 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/elliptic"
-	"golang.org/x/crypto/curve25519"
-	"golang.org/x/crypto/nacl/box"	
+	Curve "golang.org/x/crypto/curve25519"
+	// "golang.org/x/crypto/nacl/box"	
 	"github.com/dedas111/protocolX/config"
 	"github.com/dedas111/protocolX/logging"
 
@@ -49,37 +49,37 @@ const (
 )
 
 
-const Overhead = 32 + box.Overhead
+// const Overhead = 32 + box.Overhead
 
-func Seal(message []byte, nonce *[24]byte, publicKeys []*[32]byte) ([]byte, []*[32]byte) {
-	onion := message
-	sharedKeys := make([]*[32]byte, len(publicKeys))
-	for i := len(publicKeys) - 1; i >= 0; i-- {
-		myPublicKey, myPrivateKey, err := box.GenerateKey(rand.Reader)
-		if err != nil {
-			panic(err)
-		}
-		sharedKeys[i] = new([32]byte)
-		box.Precompute(sharedKeys[i], (*[32]byte)(publicKeys[i]), myPrivateKey)
+// func Seal(message []byte, nonce *[24]byte, publicKeys []*[32]byte) ([]byte, []*[32]byte) {
+// 	onion := message
+// 	sharedKeys := make([]*[32]byte, len(publicKeys))
+// 	for i := len(publicKeys) - 1; i >= 0; i-- {
+// 		myPublicKey, myPrivateKey, err := box.GenerateKey(rand.Reader)
+// 		if err != nil {
+// 			panic(err)
+// 		}
+// 		sharedKeys[i] = new([32]byte)
+// 		box.Precompute(sharedKeys[i], (*[32]byte)(publicKeys[i]), myPrivateKey)
 
-		onion = box.SealAfterPrecomputation(myPublicKey[:], onion, nonce, sharedKeys[i])
-	}
+// 		onion = box.SealAfterPrecomputation(myPublicKey[:], onion, nonce, sharedKeys[i])
+// 	}
 
-	return onion, sharedKeys
-}
+// 	return onion, sharedKeys
+// }
 
-func Open(onion []byte, nonce *[24]byte, sharedKeys []*[32]byte) ([]byte, bool) {
-	var ok bool
-	message := onion
-	for i := 0; i < len(sharedKeys); i++ {
-		message, ok = box.OpenAfterPrecomputation(nil, message, nonce, sharedKeys[i])
-		if !ok {
-			return nil, false
-		}
-	}
+// func Open(onion []byte, nonce *[24]byte, sharedKeys []*[32]byte) ([]byte, bool) {
+// 	var ok bool
+// 	message := onion
+// 	for i := 0; i < len(sharedKeys); i++ {
+// 		message, ok = box.OpenAfterPrecomputation(nil, message, nonce, sharedKeys[i])
+// 		if !ok {
+// 			return nil, false
+// 		}
+// 	}
 
-	return message, true
-}
+// 	return message, true
+// }
 
 // PackForwardMessage encapsulates the given message into the cryptographic Sphinx packet format.
 // As arguments the function takes the path, consisting of the sequence of nodes the packet should traverse
@@ -117,7 +117,7 @@ func PackForwardMessage(curve elliptic.Curve, path config.E2EPath, delays []floa
 // createHeader returns an error.
 func createHeader(curve elliptic.Curve, nodes []config.MixConfig, delays []float64, dest config.ClientConfig) ([]HeaderInitials, Header, error) {
 
-	x, err := randomBigInt(curve.Params())
+	x, err := randomBigInt()
 
 	if err != nil {
 		logLocal.WithError(err).Error("Error in createHeader - randomBigInt failed")
@@ -238,7 +238,7 @@ func getSharedSecrets(curve elliptic.Curve, nodes []config.MixConfig, initialVal
 		s := expo(n.PubKey, blindFactors)
 		aes_s := KDF(s)
 
-		blinder, err := computeBlindingFactor(curve, aes_s)
+		blinder, err := computeBlindingFactor(aes_s)
 		if err != nil {
 			logLocal.WithError(err).Error("Error in getSharedSecrets - computeBlindingFactor failed")
 			return nil, err
@@ -284,7 +284,7 @@ func computeFillers(nodes []config.MixConfig, tuples []HeaderInitials) (string, 
 // shared secrets. Blinding factors allow both the sender and intermediate nodes
 // recompute the shared keys used at each hop of the message processing.
 // computeBlindingFactor returns a value of a blinding factor or an error.
-func computeBlindingFactor(curve elliptic.Curve, key []byte) (*big.Int, error) {
+func computeBlindingFactor(key []byte) (*big.Int, error) {
 	iv := []byte("initialvector000")
 	blinderBytes, err := computeSharedSecretHash(key, iv)
 
@@ -293,7 +293,7 @@ func computeBlindingFactor(curve elliptic.Curve, key []byte) (*big.Int, error) {
 		return &big.Int{}, err
 	}
 
-	return bytesToBigNum(curve, blinderBytes), nil
+	return bytesToBigNum(blinderBytes), nil
 }
 
 // computeSharedSecretHash computes the hash value of the shared secret key
@@ -342,10 +342,17 @@ func ProcessSphinxPacket(packetBytes []byte, privKey []byte) (Hop, Commands, []b
 	beta := packet.Hdr.Beta
 	mac := packet.Hdr.Mac
 
-	curve := elliptic.P224()
-	alphaX, alphaY := elliptic.Unmarshal(curve, alpha)
-	sharedSecretX, sharedSecretY := curve.Params().ScalarMult(alphaX, alphaY, privKey)
-	sharedSecret := elliptic.Marshal(curve, sharedSecretX, sharedSecretY)
+	sharedSecret, err := Curve.X25519(privKey, alpha)
+
+	if err != nil {
+		logLocal.WithError(err).Error("Error in ProcessSphinxPacket - Group operation failed, probably invalid alpha.")
+		return Hop{}, Commands{}, nil, err
+	}
+
+	// curve := elliptic.P224()
+	// alphaX, alphaY := elliptic.Unmarshal(curve, alpha)
+	// sharedSecretX, sharedSecretY := curve.Params().ScalarMult(alphaX, alphaY, privKey)
+	// sharedSecret := elliptic.Marshal(curve, sharedSecretX, sharedSecretY)
 
 	aes_s := KDF(sharedSecret)
 	sharedKey := KDF(aes_s)
@@ -357,14 +364,15 @@ func ProcessSphinxPacket(packetBytes []byte, privKey []byte) (Hop, Commands, []b
 		// return Hop{}, Commands{}, Header{}, errors.New("packet processing error: MACs are not matching")
 	}
 
-	blinder, err := computeBlindingFactor(curve, aes_s)
+	blinder, err := computeBlindingFactor(aes_s)
 	if err != nil {
 		logLocal.WithError(err).Error("Error in ProcessSphinxHeader - computeBlindingFactor failed")
 		// return Hop{}, Commands{}, Header{}, err
 	}
 
-	newAlphaX, newAlphaY := curve.Params().ScalarMult(alphaX, alphaY, blinder.Bytes())
-	newAlpha := elliptic.Marshal(curve, newAlphaX, newAlphaY)
+	// newAlphaX, newAlphaY := curve.Params().ScalarMult(alphaX, alphaY, blinder.Bytes())
+	// newAlpha := elliptic.Marshal(curve, newAlphaX, newAlphaY)
+	newAlpha,_ := Curve.X25519(blinder.Bytes(), alpha)
 
 	decBeta, err := AES_CTR(sharedKey, beta)
 	if err != nil {
@@ -446,10 +454,17 @@ func ProcessSphinxHeader(packet Header, privKey []byte) (Hop, Commands, Header, 
 	beta := packet.Beta
 	mac := packet.Mac
 
-	curve := elliptic.P224()
-	alphaX, alphaY := elliptic.Unmarshal(curve, alpha)
-	sharedSecretX, sharedSecretY := curve.Params().ScalarMult(alphaX, alphaY, privKey)
-	sharedSecret := elliptic.Marshal(curve, sharedSecretX, sharedSecretY)
+	// curve := elliptic.P224()
+	// alphaX, alphaY := elliptic.Unmarshal(curve, alpha)
+	// sharedSecretX, sharedSecretY := curve.Params().ScalarMult(alphaX, alphaY, privKey)
+	// sharedSecret := elliptic.Marshal(curve, sharedSecretX, sharedSecretY)
+
+	sharedSecret, err := Curve.X25519(privKey, alpha)
+
+	if err != nil {
+		logLocal.WithError(err).Error("Error in ProcessSphinxPacket - Group operation failed, probably invalid alpha.")
+		return Hop{}, Commands{}, Header{}, err
+	}
 
 	aes_s := KDF(sharedSecret)
 	encKey := KDF(aes_s)
@@ -460,14 +475,16 @@ func ProcessSphinxHeader(packet Header, privKey []byte) (Hop, Commands, Header, 
 		return Hop{}, Commands{}, Header{}, errors.New("packet processing error: MACs are not matching")
 	}
 
-	blinder, err := computeBlindingFactor(curve, aes_s)
+	blinder, err := computeBlindingFactor(aes_s)
 	if err != nil {
 		logLocal.WithError(err).Error("Error in ProcessSphinxHeader - computeBlindingFactor failed")
 		return Hop{}, Commands{}, Header{}, err
 	}
 
-	newAlphaX, newAlphaY := curve.Params().ScalarMult(alphaX, alphaY, blinder.Bytes())
-	newAlpha := elliptic.Marshal(curve, newAlphaX, newAlphaY)
+	// newAlphaX, newAlphaY := curve.Params().ScalarMult(alphaX, alphaY, blinder.Bytes())
+	// newAlpha := elliptic.Marshal(curve, newAlphaX, newAlphaY)
+
+	newAlpha,_ := Curve.X25519(blinder.Bytes(), alpha)
 
 	decBeta, err := AES_CTR(encKey, beta)
 	if err != nil {
@@ -501,10 +518,17 @@ func readBeta(beta RoutingInfo) (Hop, Commands, []byte, []byte) {
 // ProcessSphinxPayload returns the new packet payload or an error if the decryption failed.
 func ProcessSphinxPayload(alpha []byte, payload []byte, privKey []byte) ([]byte, error) {
 
-	curve := elliptic.P224()
-	alphaX, alphaY := elliptic.Unmarshal(curve, alpha)
-	sharedSecretX, sharedSecretY := curve.Params().ScalarMult(alphaX, alphaY, privKey)
-	sharedSecret := elliptic.Marshal(curve, sharedSecretX, sharedSecretY)
+	// curve := elliptic.P224()
+	// alphaX, alphaY := elliptic.Unmarshal(curve, alpha)
+	// sharedSecretX, sharedSecretY := curve.Params().ScalarMult(alphaX, alphaY, privKey)
+	// sharedSecret := elliptic.Marshal(curve, sharedSecretX, sharedSecretY)
+
+	sharedSecret, err := Curve.X25519(privKey, alpha)
+
+	if err != nil {
+		logLocal.WithError(err).Error("Error in ProcessSphinxPacket - Group operation failed, probably invalid alpha.")
+		return nil, err
+	}
 
 	aes_s := KDF(sharedSecret)
 	decKey := KDF(aes_s)
