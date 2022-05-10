@@ -23,7 +23,7 @@ import (
 	"github.com/dedas111/protocolX/config"
 	"github.com/dedas111/protocolX/helpers"
 	"github.com/dedas111/protocolX/logging"
-	sphinx "github.com/dedas111/protocolX/sphinx"
+	sphinx "github.com/dedas111/protocolX/sphinx2"
 
 	"github.com/golang/protobuf/proto"
 

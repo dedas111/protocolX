@@ -19,7 +19,8 @@ package node
 
 import (
 	"github.com/dedas111/protocolX/logging"
-	"github.com/dedas111/protocolX/sphinx"
+	// "github.com/dedas111/protocolX/sphinx"
+	sphinx "github.com/dedas111/protocolX/sphinx2"
 	// "time"
 )
 
