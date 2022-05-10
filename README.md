@@ -35,3 +35,17 @@ To simulate the clients run
 ```shell
 bash run_clients.sh
 ```
+
+## Debugging
+
+To run a single node statically as compute without changing the role run
+```shell
+go run main.go -typ=provider -id="1" -port=9900 -staticRole=compute -computeListenerCount=8 -funnelListenerCount=4
+```
+This expects compute nodes to have 8 listener ports and funnels to have 4 listener ports.
+IDs should be assigned to funnels first as the current connection establishment to them uses the modulo operation.
+
+Same for funnels
+```shell
+go run main.go -typ=provider -id="0" -port=9900 -staticRole=funnel -computeListenerCount=8 -funnelListenerCount=4
+```
