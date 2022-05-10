@@ -23,7 +23,7 @@ import (
 	"crypto/sha256"
 	// "crypto/ed25519"
 	Curve "golang.org/x/crypto/curve25519"
-	"golang.org/x/crypto/nacl/box"
+	// "golang.org/x/crypto/nacl/box"
 
 	"math/big"
 )
@@ -65,11 +65,13 @@ func Hmac(key, message []byte) []byte {
 }
 
 func GenerateKeyPair() ([]byte, []byte, error) {
-	priv, pub, err := box.GenerateKey(rand.Reader)
+	priv, err := randomBigIntBytes()
 
 	if err != nil {
 		return nil, nil, err
 	}
+
+	pub, err := Curve.X25519(priv[:], Curve.Basepoint)
 
 	return pub[:], priv[:], nil
 }
@@ -93,42 +95,150 @@ func randomBigInt() (big.Int, error) {
 	return *nBig, nil
 }
 
+func randomBigIntBytes() ([]byte, error) {
+	// example_string := "kerielle"
+    // hash := sha256.Sum256([]byte(example_string))
+	
+	nBig, err := rand.Int(rand.Reader, P)
+	if err != nil {
+		return nil, err
+	}
+	x := sha256.Sum256(nBig.Bytes())
+	return x[:], nil
+}
+
+// DEPRECATED.
 func expo(base []byte, exp []big.Int) []byte {
 	x := exp[0]
+
+	s, err := Curve.X25519(x.Bytes(), base)
+
+	if err != nil {
+		logLocal.WithError(err).Error("(expo)Error in ProcessSphinxPacket - Group operation failed, probably invalid base.")
+		return nil
+	}
+
 	for _, val := range exp[1:] {
-		x = *big.NewInt(0).Mul(&x, &val)
+		x = val
+		s, err = Curve.X25519(x.Bytes(), s)
+
+		if err != nil {
+			logLocal.WithError(err).Error("(expo)Error in ProcessSphinxHeader for node.")
+			return nil
+		}
 	}
 
 	// baseX, baseY := elliptic.Unmarshal(elliptic.P224(), base)
 	// resultX, resultY := curve.Params().ScalarMult(baseX, baseY, x.Bytes())
 	// return elliptic.Marshal(curve, resultX, resultY)
 
-	s, err := Curve.X25519(x.Bytes(), base)
+	// s, err := Curve.X25519(x.Bytes(), base)
 
-	if err != nil {
-		logLocal.WithError(err).Error("Error in ProcessSphinxPacket - Group operation failed, probably invalid base.")
-		return nil
-	}
+	// if err != nil {
+	// 	logLocal.WithError(err).Error("Error in ProcessSphinxPacket - Group operation failed, probably invalid base.")
+	// 	return nil
+	// }
 	return s
 }
 
+
+func expoBytes(base []byte, exp [][]byte) []byte {
+	x := exp[0]
+
+	s, err := Curve.X25519(x, base)
+
+	if err != nil {
+		logLocal.WithError(err).Error("(expo)Error in ProcessSphinxPacket - Group operation failed, probably invalid base.")
+		return nil
+	}
+
+	for _, val := range exp[1:] {
+		x = val
+		s, err = Curve.X25519(x, s)
+
+		if err != nil {
+			logLocal.WithError(err).Error("(expo)Error in ProcessSphinxHeader for node.")
+			return nil
+		}
+	}
+
+	// baseX, baseY := elliptic.Unmarshal(elliptic.P224(), base)
+	// resultX, resultY := curve.Params().ScalarMult(baseX, baseY, x.Bytes())
+	// return elliptic.Marshal(curve, resultX, resultY)
+
+	// s, err := Curve.X25519(x.Bytes(), base)
+
+	// if err != nil {
+	// 	logLocal.WithError(err).Error("Error in ProcessSphinxPacket - Group operation failed, probably invalid base.")
+	// 	return nil
+	// }
+	return s
+}
+
+// DEPRECATED
 func expoGroupBase(exp []big.Int) []byte {
 	x := exp[0]
 
-	for _, val := range exp[1:] {
-		x = *big.NewInt(0).Mul(&x, &val)
-	}
-
 	s, err := Curve.X25519(x.Bytes(), Curve.Basepoint)
-	// resultX, resultY := curve.Params().ScalarBaseMult(x.Bytes())
-	// return elliptic.Marshal(curve, resultX, resultY)
+
 	if err != nil {
-		logLocal.WithError(err).Error("Error in ProcessSphinxPacket - Group operation failed, probably invalid base.")
+		logLocal.WithError(err).Error("(expoGroupBase)Error in ProcessSphinxPacket - Group operation failed, probably invalid base.")
 		return nil
 	}
+
+	for _, val := range exp[1:] {
+		x = val
+		s, err = Curve.X25519(x.Bytes(), s)
+
+		if err != nil {
+			logLocal.WithError(err).Error("(expoGroupBase)Error in ProcessSphinxHeader for node.")
+			return nil
+		}
+	}
+
+	// s, err := Curve.X25519(x.Bytes(), Curve.Basepoint)
+	// resultX, resultY := curve.Params().ScalarBaseMult(x.Bytes())
+	// return elliptic.Marshal(curve, resultX, resultY)
+	// if err != nil {
+	// 	logLocal.WithError(err).Error("Error in ProcessSphinxPacket - Group operation failed, probably invalid base.")
+	// 	return nil
+	// }
 	
 	return s
 }
+
+
+func expoGroupBaseBytes(exp [][]byte) []byte {
+	x := exp[0]
+
+	s, err := Curve.X25519(x, Curve.Basepoint)
+
+	if err != nil {
+		logLocal.WithError(err).Error("(expoGroupBase)Error in ProcessSphinxPacket - Group operation failed, probably invalid base.")
+		return nil
+	}
+
+	for _, val := range exp[1:] {
+		x = val
+		s, err = Curve.X25519(x, s)
+
+		if err != nil {
+			logLocal.WithError(err).Error("(expoGroupBase)Error in ProcessSphinxHeader for node.")
+			return nil
+		}
+	}
+
+	// s, err := Curve.X25519(x.Bytes(), Curve.Basepoint)
+	// resultX, resultY := curve.Params().ScalarBaseMult(x.Bytes())
+	// return elliptic.Marshal(curve, resultX, resultY)
+	// if err != nil {
+	// 	logLocal.WithError(err).Error("Error in ProcessSphinxPacket - Group operation failed, probably invalid base.")
+	// 	return nil
+	// }
+	
+	return s
+}
+
 
 func computeMac(key, data []byte) []byte {
 	return Hmac(key, data)
