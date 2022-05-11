@@ -81,6 +81,22 @@ func TestExpoSingleValue(t *testing.T) {
 
 }
 
+
+// Do not run this test...
+// func TestActuallyGenrateFuckingKeyPair(t *testing.T) {
+// 	y, x, err := GenerateKeyPair()
+
+// 	if err != nil {
+// 		t.Error(err)
+// 	}
+// 	err = os.WriteFile("/home/debajyoti/Documents/protocolX/pki/pubP", y, 0666)
+// 	err = os.WriteFile("/home/debajyoti/Documents/protocolX/pki/privP", x, 0666)
+
+// 	if err != nil {
+// 		t.Error(err)
+// 	}
+// }
+
 func TestHash(t *testing.T) {
 	_, x, err := GenerateKeyPair()
 
