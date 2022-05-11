@@ -58,4 +58,5 @@ Furthermore one needs to change **remoteIP**, **localIP** and **listOfComputeIPs
 Start with giving IDs to the funnels starting with 0. After all funnels have an ID, continue with the compute nodes.\
 There is no order for starting nodes.\
 Watch out for the amount of funnels (**numOfFunnels** in **server.go**) if in a case with static roles.\
-The parameters **computeListeners** and **funnelListeners** are overridden by cli parameters and can be used to tell compute and funnel nodes how many ports each other have. Each server will use double the amount of system threads as ports.
+The parameter **computeListeners** is overridden by cli parameters and can be used to tell funnel nodes how many ports a compute has. Can be omitted for compute nodes.\
+For the usage of funnel nodes, **idForFunnelConn** and **numOfFunnelPortsToUse** were introduced. Each compute gets a unique ID starting with 0 and the number of funnel ports to use. Compute will connect to the funnel without any funnel port used multiple times. A total of **numOfFunnelPortsToUse** times the amount of compute nodes will be used on the funnel. They are expected to be available. 

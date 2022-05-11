@@ -63,7 +63,6 @@ var (
 	emptyCtr         = 0
 	numOfFunnels     = 1
 	computeListeners = 4
-	funnelListeners  = 16
 
 	logLocal = logging.PackageLogger()
 )
@@ -748,10 +747,9 @@ func (p *Server) authenticateUser(clientId string, clientToken []byte) bool {
 
 // NewServer constructs a new server object.
 // NewServer returns a new server object and an error.
-func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string, staticRole string, computeListenerCount string, funnelListenerCount string, idForFunnelConn string, numOfFunnelPortsToUse string) (*Server, error) {
+func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string, staticRole string, computeListenerCount string, idForFunnelConn string, numOfFunnelPortsToUse string) (*Server, error) {
 	staticServerRole = staticRole
 	computeListeners, _ = strconv.Atoi(computeListenerCount)
-	funnelListeners, _ = strconv.Atoi(funnelListenerCount)
 	node := node.NewMix(pubKey, prvKey)
 	server := Server{id: id, host: host, port: port, Mix: node, listener: nil}
 	server.config = config.MixConfig{Id: server.id, Host: server.host, Port: server.port, PubKey: server.GetPublicKey()}
