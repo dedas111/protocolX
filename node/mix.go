@@ -65,6 +65,7 @@ func (m *Mix) ProcessPacket(packet []byte, c chan<- MixPacket, errCh chan<- erro
 func (m *Mix) ProcessPacketInSameThread(packet []byte) (*MixPacket, error) {
 
 	// logLocal.Info("Mix: Before processing the sphinx packet, time : ", (time.Now()).String())
+	logLocal.Info("Mix: Size of the private key: ", len(m.prvKey))
 	nextHop, commands, newPacket, err := sphinx.ProcessSphinxPacket(packet, m.prvKey)
 	// logLocal.Info("Mix: After processing the sphinx packet, time : ", (time.Now()).String())
 	if err != nil {
