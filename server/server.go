@@ -747,7 +747,7 @@ func (p *Server) authenticateUser(clientId string, clientToken []byte) bool {
 
 // NewServer constructs a new server object.
 // NewServer returns a new server object and an error.
-func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string, staticRole string, computeListenerCount string, idForFunnelConn string, numOfFunnelPortsToUse string) (*Server, error) {
+func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string, staticRole string, funnelAmount string, computeListenerCount string, idForFunnelConn string, numOfFunnelPortsToUse string) (*Server, error) {
 	staticServerRole = staticRole
 	computeListeners, _ = strconv.Atoi(computeListenerCount)
 	node := node.NewMix(pubKey, prvKey)
@@ -758,6 +758,7 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 	server.connectionsToCompute = make(map[string]*tls.Conn)
 	server.idForFunnelConn, _ = strconv.Atoi(idForFunnelConn)
 	server.numOfFunnelPortsToUse, _ = strconv.Atoi(numOfFunnelPortsToUse)
+	numOfFunnels, _ = strconv.Atoi(funnelAmount)
 
 	threadsCount = runtime.NumCPU()
 	//logLocal.Info("Starting server with logical cores: ", threadsCount)
