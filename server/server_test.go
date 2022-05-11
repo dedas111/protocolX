@@ -66,8 +66,8 @@ const (
 	testDatabase       = "testDatabase.db"
 	remoteIP           = "10.46.234.198" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
 	localIP            = "10.46.234.198" // IP of the client receiving the packets for the tests
-	threadsCountClient = 4                // listener threads on client
-	threadsCountServer = 4                // listener threads on compute/server
+	threadsCountClient = 4               // listener threads on client
+	threadsCountServer = 4               // listener threads on compute/server
 )
 
 func createTestServer() (*Server, error) {
@@ -364,13 +364,13 @@ func createTlsConnection(port int, t *testing.T) net.Conn {
 	// defer conn.Close()
 	fmt.Println("client: connected to: ", conn.RemoteAddr())
 	/*TestServer_TlsMemoryLoad
-		state := conn.ConnectionState()
-		for _, v := range state.PeerCertificates {
-			fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
-			fmt.Println(v.Subject)
-		}
-		t.Log("client: handshake: ", state.HandshakeComplete)
-		t.Log("client: mutual: ", state.NegotiatedProtocolIsMutual)
+	state := conn.ConnectionState()
+	for _, v := range state.PeerCertificates {
+		fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
+		fmt.Println(v.Subject)
+	}
+	t.Log("client: handshake: ", state.HandshakeComplete)
+	t.Log("client: mutual: ", state.NegotiatedProtocolIsMutual)
 	*/
 	// message := "Hello\n"
 	// n, err := io.WriteString(conn, message)
@@ -614,7 +614,7 @@ func TestServer_EndToEndStandalone(t *testing.T) {
 		testPackages[i] = make([][]byte, threadsCountServer)
 	}
 	for j, ip := range listOfComputeIPs {
-		for i := 0; i < threadsCountClient; i++ {
+		for i := 0; i < threadsCountServer; i++ {
 			sphinxPacket := createStaticTestPacketWithPortForIndividual(t, "hello world", ip, strconv.Itoa(initialListenPort+i))
 			bSphinxPacket, err := proto.Marshal(sphinxPacket)
 			if err != nil {
