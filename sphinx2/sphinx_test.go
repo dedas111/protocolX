@@ -91,8 +91,8 @@ func TestExpoSingleValue(t *testing.T) {
 // 	if err != nil {
 // 		t.Error(err)
 // 	}
-// 	err = os.WriteFile("/home/debajyoti/Documents/protocolX/pki/pubP", y, 0666)
-// 	err = os.WriteFile("/home/debajyoti/Documents/protocolX/pki/privP", x, 0666)
+// 	err = os.WriteFile("/home/ec2-user/GolandProjects/protocolX/pki/pubP", y, 0666)
+// 	err = os.WriteFile("/home/ec2-user/GolandProjects/protocolX/pki/privP", x, 0666)
 
 // 	if err != nil {
 // 		t.Error(err)

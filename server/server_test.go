@@ -347,7 +347,7 @@ func TestProviderServer_HandleAssignRequest(t *testing.T) {
 
 func createTlsConnection(port int, t *testing.T) net.Conn {
 	t.Log("Before client loadkeys")
-	cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/client.pem", "/home/debajyoti/Documents/protocolX/certs/client.key")
+	cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs2/client.pem", "/home/ec2-user/GolandProjects/protocolX/certs2/client.key")
 	if err != nil {
 		t.Log("server: loadkeys")
 		return nil
@@ -383,7 +383,7 @@ func createTlsConnection(port int, t *testing.T) net.Conn {
 
 func createTlsConnectionToIndividual(ip string, port int, t *testing.T) net.Conn {
 	t.Log("Before client loadkeys")
-	cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/client.pem", "/home/debajyoti/Documents/protocolX/certs/client.key")
+	cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs2/client.pem", "/home/ec2-user/GolandProjects/protocolX/certs2/client.key")
 	if err != nil {
 		t.Log("server: loadkeys")
 		return nil
@@ -563,7 +563,7 @@ func TestServer_SphinxPacketSize(t *testing.T) {
 // run integrationtest_preparation first!
 /*
 func TestServer_CheckMultipleFunnels(t *testing.T) {
-	db, err := pki.OpenDatabase("/home/debajyoti/Documents/protocolX/"+PKI_DIR, "sqlite3")
+	db, err := pki.OpenDatabase("/home/ec2-user/GolandProjects/protocolX/"+PKI_DIR, "sqlite3")
 	if err != nil {
 		panic(err)
 	}
@@ -585,7 +585,7 @@ func TestServer_CheckMultipleFunnels(t *testing.T) {
 
 // this test sends sphinx encrypted packets to servers and expects them to answer using a listener
 func TestServer_EndToEndStandalone(t *testing.T) {
-	totalPackets := 100 // sent per Client Thread
+	totalPackets := 1 // sent per Client Thread
 	packetCountTest = totalPackets * threadsCountServer * len(listOfComputeIPs)
 	go createTestTLSListener(t)
 
@@ -798,7 +798,7 @@ func TestServer_AddPacketsAndRearrange(t *testing.T) {
 
 func createTestTLSListener(t *testing.T) error {
 	receivedPackets := 0
-	cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/server.pem", "/home/debajyoti/Documents/protocolX/certs/server.key")
+	cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs2/server.pem", "/home/ec2-user/GolandProjects/protocolX/certs2/server.key")
 	if err != nil {
 		t.Error("test: loadkeys error: ", err)
 		panic(err)
@@ -896,7 +896,7 @@ func bToMb(b uint64) uint64 {
 // }
 
 func createTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
-	db, err := pki.OpenDatabase("//home/debajyoti/Documents/protocolX/"+PKI_DIR, "sqlite3")
+	db, err := pki.OpenDatabase("//home/ec2-user/GolandProjects/protocolX/"+PKI_DIR, "sqlite3")
 	if err != nil {
 		panic(err)
 	}
@@ -932,7 +932,7 @@ func createLargeTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
 
 func createTestPacketForDynamicFunnels(t *testing.T, payload string) *sphinx.SphinxPacket {
 	funnels := helpers.GetCurrentFunnelNodes(globalNodeCount)
-	db, err := pki.OpenDatabase("/home/debajyoti/Documents/protocolX/"+PKI_DIR, "sqlite3")
+	db, err := pki.OpenDatabase("/home/ec2-user/GolandProjects/protocolX/"+PKI_DIR, "sqlite3")
 	if err != nil {
 		panic(err)
 	}
@@ -966,7 +966,7 @@ func createTestPacketForDynamicFunnels(t *testing.T, payload string) *sphinx.Sph
 
 func createStaticTestPacketWithPort(t *testing.T, payload string, port string) *sphinx.SphinxPacket {
 	var computeConfig config.MixConfig
-	pubP, _ := os.ReadFile("/home/debajyoti/Documents/protocolX/pki/pubP")
+	pubP, _ := os.ReadFile("/home/ec2-user/GolandProjects/protocolX/pki/pubP")
 	computeConfig.Id = "1"
 	computeConfig.Port = "9900"
 	computeConfig.Host = remoteIP
@@ -986,7 +986,7 @@ func createStaticTestPacketWithPort(t *testing.T, payload string, port string) *
 
 func createStaticTestPacketWithPortForIndividual(t *testing.T, payload string, ip string, port string) *sphinx.SphinxPacket {
 	var computeConfig config.MixConfig
-	pubP, _ := os.ReadFile("/home/debajyoti/Documents/protocolX/pki/pubP")
+	pubP, _ := os.ReadFile("/home/ec2-user/GolandProjects/protocolX/pki/pubP")
 	computeConfig.Id = "1"
 	computeConfig.Port = "9900"
 	computeConfig.Host = ip

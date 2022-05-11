@@ -205,10 +205,10 @@ func main() {
 		//threads := runtime.GOMAXPROCS(0) - 2
 		//logLocal.Info("main: case provider: the total number of threads used : ", threads)
 
-		//os.WriteFile("/home/olaf/GolandProjects/pubP", pubP, 0644)
+		//os.WriteFile("/home/ec2-user/GolandProjects/pubP", pubP, 0644)
 		logLocal.Info("Trying to use local serverkeys...")
-		pubP, err := os.ReadFile("/home/debajyoti/Documents/protocolX/pki/pubP")
-		privP, err := os.ReadFile("/home/debajyoti/Documents/protocolX/pki/privP")
+		pubP, err := os.ReadFile("/home/ec2-user/GolandProjects/protocolX/pki/pubP")
+		privP, err := os.ReadFile("/home/ec2-user/GolandProjects/protocolX/pki/privP")
 
 		if err != nil {
 			logLocal.Info("Reading serverkeys from file failed, generating new keys.")

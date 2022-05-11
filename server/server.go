@@ -305,7 +305,7 @@ func (p *Server) forwardPacketTLS(sphinxPacket []byte, address string) error {
 	//	return err
 	///}
 
-	cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/client.pem", "/home/debajyoti/Documents/protocolX/certs/client.key")
+	cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs2/client.pem", "/home/ec2-user/GolandProjects/protocolX/certs2/client.key")
 	if err != nil {
 		logLocal.Info("compute node: loadkeys: ", err)
 	}
@@ -457,7 +457,7 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 		conn, pres := p.connectionsToCompute[dstAddr]
 
 		if !pres {
-			cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/client.pem", "/home/debajyoti/Documents/protocolX/certs/client.key")
+			cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs2/client.pem", "/home/ec2-user/GolandProjects/protocolX/certs2/client.key")
 			if err != nil {
 				logLocal.Info("compute node: loadkeys: ", err)
 			}
@@ -491,7 +491,7 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 // startTlsServer() opens multiple TLS listeners on multiple ports starting with the port given during server start.
 // The amount pf listeners depends on thread count.
 func (p *Server) startTlsServer() error {
-	cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/server.pem", "/home/debajyoti/Documents/protocolX/certs/server.key")
+	cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs2/server.pem", "/home/ec2-user/GolandProjects/protocolX/certs2/server.key")
 	if err != nil {
 		// log.Fatalf("server: loadkeys: %s", err)
 		logLocal.Info("server: loadkeys: ", err)
@@ -601,7 +601,7 @@ func (p *Server) handleClient(conn net.Conn, someIndex int) {
 
 /* // not required now...
 func (p *Server) createTlsConnection() {
-    cert, err := tls.LoadX509KeyPair("certs/client.pem", "certs/client.key")
+    cert, err := tls.LoadX509KeyPair("certs2/client.pem", "certs2/client.key")
     if err != nil {
         logLocal.Info("server: loadkeys: ", err)
     }
@@ -824,7 +824,7 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 		err = proto.Unmarshal(results, &mixConfig)
 
 		// establish a connection with them using all available ports stated by threadsCount
-		cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/client.pem", "/home/debajyoti/Documents/protocolX/certs/client.key")
+		cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs2/client.pem", "/home/ec2-user/GolandProjects/protocolX/certs2/client.key")
 		if err != nil {
 			logLocal.Info("compute node: loadkeys: ", err)
 		}

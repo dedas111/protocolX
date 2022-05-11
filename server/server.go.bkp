@@ -288,7 +288,7 @@ func (p *Server) relayPacket() error {
 }
 
 func (p *Server) startTlsServer() error {
-    cert, err := tls.LoadX509KeyPair("/home/das48/certs2/server.pem", "/home/das48/certs2/server.key")
+    cert, err := tls.LoadX509KeyPair("/home/das48/certs22/server.pem", "/home/das48/certs22/server.key")
     if err != nil {
         // log.Fatalf("server: loadkeys: %s", err)
 		logLocal.Info("server: loadkeys: ", err)
@@ -383,7 +383,7 @@ func (p *Server) handleClient(conn net.Conn) {
 
 /* // not required now... 
 func (p *Server) createTlsConnection() {
-    cert, err := tls.LoadX509KeyPair("certs/client.pem", "certs/client.key")
+    cert, err := tls.LoadX509KeyPair("certs2/client.pem", "certs2/client.key")
     if err != nil {
         logLocal.Info("server: loadkeys: ", err)
     }
