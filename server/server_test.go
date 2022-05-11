@@ -60,7 +60,8 @@ var packetCountTest int
 var tsStart time.Time
 var tsDone time.Time
 
-var listOfComputeIPs = [...]string{"10.46.234.198"}
+var listOfComputeIPs = [...]string{"192.168.178.84"}
+var clientOffset = 0
 
 const (
 	testDatabase       = "testDatabase.db"
@@ -615,12 +616,13 @@ func TestServer_EndToEndStandalone(t *testing.T) {
 	}
 	for j, ip := range listOfComputeIPs {
 		for i := 0; i < threadsCountServer; i++ {
-			sphinxPacket := createStaticTestPacketWithPortForIndividual(t, "hello world", ip, strconv.Itoa(initialListenPort+i))
+			sphinxPacket := createStaticTestPacketWithPortForIndividual(t, "hello world", ip, strconv.Itoa(initialListenPort+(clientOffset%threadsCountClient)))
 			bSphinxPacket, err := proto.Marshal(sphinxPacket)
 			if err != nil {
 				t.Fatal(err)
 			}
 			testPackages[j][i] = bSphinxPacket
+			clientOffset++
 		}
 	}
 	fmt.Println("Sending " + strconv.Itoa(threadsCountServer*totalPackets*len(listOfComputeIPs)) + " packets to " + strconv.Itoa(len(listOfComputeIPs)) + " compute nodes.")
