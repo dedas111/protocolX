@@ -125,6 +125,8 @@ func main() {
 	staticRole := flag.String("staticRole", "", "Debug flag to set server to compute or funnel functionality")
 	computeListenerCount := flag.String("computeListenerCount", "", "amount of listeners provided by compute") // added for testing in AWS
 	funnelListenerCount := flag.String("funnelListenerCount", "", "amount of listeners provided by funnel")    // added for testing in AWS
+	idForFunnelConn := flag.String("idForFunnelConn", "", "ID to use as a reference in determining which ports to use on each funnel")
+	numOfFunnelPortsToUse := flag.String("numOfFunnelPortsToUse", "", "number of connections to be established to each funnel")
 	flag.Parse()
 
 	err := pkiPreSetting(PKI_DIR)
@@ -189,7 +191,7 @@ func main() {
 			panic(err)
 		}
 
-		mixServer, err := server.NewServer(*id, *host, *port, pubM, privM, PKI_DIR, *staticRole, *computeListenerCount, *funnelListenerCount)
+		mixServer, err := server.NewServer(*id, *host, *port, pubM, privM, PKI_DIR, *staticRole, *computeListenerCount, *funnelListenerCount, *idForFunnelConn, *numOfFunnelPortsToUse)
 		if err != nil {
 			panic(err)
 		}
@@ -220,7 +222,7 @@ func main() {
 		}
 
 		///logLocal.Info("Saving IP to database: ", *host)
-		providerServer, err := server.NewServer(*id, *host, *port, pubP, privP, PKI_DIR, *staticRole, *computeListenerCount, *funnelListenerCount)
+		providerServer, err := server.NewServer(*id, *host, *port, pubP, privP, PKI_DIR, *staticRole, *computeListenerCount, *funnelListenerCount, *idForFunnelConn, *numOfFunnelPortsToUse)
 		if err != nil {
 			panic(err)
 		}

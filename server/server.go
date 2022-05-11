@@ -92,11 +92,13 @@ type Server struct {
 	assignedClients map[string]ClientRecord
 	config          config.MixConfig
 
-	aPac                []node.MixPacket
-	mutex               sync.Mutex
-	runningIndex        []int
-	receivedPackets     [][][]byte
-	indexSinceLastRelay []int // used by funnel to determine which packets are new
+	aPac                  []node.MixPacket
+	mutex                 sync.Mutex
+	runningIndex          []int
+	receivedPackets       [][][]byte
+	indexSinceLastRelay   []int // used by funnel to determine which packets are new
+	idForFunnelConn       int
+	numOfFunnelPortsToUse int
 
 	connections          map[int][]*tls.Conn  // TLS connection to funnels
 	connectionsToCompute map[string]*tls.Conn // TLS connection to compute nodes
@@ -332,7 +334,7 @@ func (p *Server) forwardPacketToFunnel(computePacket config.ComputePacket, funne
 		return err
 	}
 
-	randPort := mrand.Int31n(int32(funnelListeners - 1))
+	randPort := mrand.Int31n(int32(p.numOfFunnelPortsToUse - 1))
 	logLocal.Info("Server: Forwarding sphinx packet to funnel with id and port: ", funnelId, randPort)
 	if p.connections[funnelId][randPort] == nil {
 		time.Sleep(time.Millisecond * 650)
@@ -746,7 +748,7 @@ func (p *Server) authenticateUser(clientId string, clientToken []byte) bool {
 
 // NewServer constructs a new server object.
 // NewServer returns a new server object and an error.
-func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string, staticRole string, computeListenerCount string, funnelListenerCount string) (*Server, error) {
+func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte, pkiPath string, staticRole string, computeListenerCount string, funnelListenerCount string, idForFunnelConn string, numOfFunnelPortsToUse string) (*Server, error) {
 	staticServerRole = staticRole
 	computeListeners, _ = strconv.Atoi(computeListenerCount)
 	funnelListeners, _ = strconv.Atoi(funnelListenerCount)
@@ -756,6 +758,8 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 	server.assignedClients = make(map[string]ClientRecord)
 	server.connections = make(map[int][]*tls.Conn)
 	server.connectionsToCompute = make(map[string]*tls.Conn)
+	server.idForFunnelConn, _ = strconv.Atoi(idForFunnelConn)
+	server.numOfFunnelPortsToUse, _ = strconv.Atoi(numOfFunnelPortsToUse)
 
 	threadsCount = runtime.NumCPU()
 	//logLocal.Info("Starting server with logical cores: ", threadsCount)
@@ -829,12 +833,12 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 
 		nodeHost := mixConfig.Host
 		intPort, _ := strconv.Atoi(mixConfig.Port)
-		p.connections[funnelId] = make([]*tls.Conn, funnelListeners)
+		p.connections[funnelId] = make([]*tls.Conn, p.numOfFunnelPortsToUse)
 
-		// open connection with every available port for multithreading the ingress of funnel nodes
-		i := 0
-		for i < funnelListeners {
-			realPort := intPort + i
+		// open connection with funnel port determined by the function (p.idForFunnelConn * p.numOfFunnelPortsToUse) + i
+		for i := 0; i < p.numOfFunnelPortsToUse; i++ {
+			tmp := (p.idForFunnelConn * p.numOfFunnelPortsToUse) + i
+			realPort := intPort + tmp
 			nodePort := strconv.Itoa(realPort)
 			//logLocal.Info("compute node: Trying to connect to funnel: ", nodeHost+":"+nodePort)
 			conn, err := tls.Dial("tcp", nodeHost+":"+nodePort, &config)
@@ -843,7 +847,6 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 			}
 			p.connections[funnelId][i] = conn
 			logLocal.Info("compute node: connected to funnel: ", conn.RemoteAddr())
-			i = i + 1
 		}
 		// state := conn.ConnectionState() Debug Info about connection
 	}
