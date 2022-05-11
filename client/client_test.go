@@ -16,7 +16,7 @@ package client
 
 import (
 	"github.com/dedas111/protocolX/config"
-	sphinx "github.com/dedas111/protocolX/sphinx"
+	sphinx "github.com/dedas111/protocolX/sphinx2"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/golang/protobuf/proto"

@@ -24,7 +24,7 @@ import (
 	"runtime"
 	"strings"
 
-	// "github.com/dedas111/protocolX/sphinx"
+	// sphinx "github.com/dedas111/protocolX/sphinx2"
 	"github.com/dedas111/protocolX/logging"
 
 	"github.com/golang/protobuf/proto"
@@ -304,7 +304,7 @@ func (p *Server) forwardPacketTLS(sphinxPacket []byte, address string) error {
 	//	return err
 	///}
 
-	cert, err := tls.LoadX509KeyPair("/home/olaf/certs/client.pem", "/home/olaf/certs/client.key")
+	cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/client.pem", "/home/debajyoti/Documents/protocolX/certs/client.key")
 	if err != nil {
 		logLocal.Info("compute node: loadkeys: ", err)
 	}
@@ -456,7 +456,7 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 		conn, pres := p.connectionsToCompute[dstAddr]
 
 		if !pres {
-			cert, err := tls.LoadX509KeyPair("/home/olaf/certs/client.pem", "/home/olaf/certs/client.key")
+			cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/client.pem", "/home/debajyoti/Documents/protocolX/certs/client.key")
 			if err != nil {
 				logLocal.Info("compute node: loadkeys: ", err)
 			}
@@ -490,7 +490,7 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 // startTlsServer() opens multiple TLS listeners on multiple ports starting with the port given during server start.
 // The amount pf listeners depends on thread count.
 func (p *Server) startTlsServer() error {
-	cert, err := tls.LoadX509KeyPair("/home/olaf/certs/server.pem", "/home/olaf/certs/server.key")
+	cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/server.pem", "/home/debajyoti/Documents/protocolX/certs/server.key")
 	if err != nil {
 		// log.Fatalf("server: loadkeys: %s", err)
 		logLocal.Info("server: loadkeys: ", err)
@@ -757,7 +757,7 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 	server.connections = make(map[int][]*tls.Conn)
 	server.connectionsToCompute = make(map[string]*tls.Conn)
 
-	threadsCount = runtime.NumCPU() * 2
+	threadsCount = runtime.NumCPU()
 	//logLocal.Info("Starting server with logical cores: ", threadsCount)
 
 	// prevent server from adding its config multiple times to database
@@ -821,7 +821,7 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 		err = proto.Unmarshal(results, &mixConfig)
 
 		// establish a connection with them using all available ports stated by threadsCount
-		cert, err := tls.LoadX509KeyPair("/home/olaf/certs/client.pem", "/home/olaf/certs/client.key")
+		cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/client.pem", "/home/debajyoti/Documents/protocolX/certs/client.key")
 		if err != nil {
 			logLocal.Info("compute node: loadkeys: ", err)
 		}

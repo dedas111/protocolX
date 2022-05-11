@@ -16,7 +16,8 @@ package node
 
 import (
 	"github.com/dedas111/protocolX/config"
-	sphinx "github.com/dedas111/protocolX/sphinx"
+	sphinx "github.com/dedas111/protocolX/sphinx2"
+	// "github.com/dedas111/protocolX/sphinx"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"

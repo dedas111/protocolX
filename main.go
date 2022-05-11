@@ -23,7 +23,8 @@ import (
 	"github.com/dedas111/protocolX/logging"
 	"github.com/dedas111/protocolX/pki"
 	"github.com/dedas111/protocolX/server"
-	"github.com/dedas111/protocolX/sphinx"
+	// "github.com/dedas111/protocolX/sphinx"
+	sphinx "github.com/dedas111/protocolX/sphinx2"
 	"os"
 	"runtime"
 
@@ -204,8 +205,8 @@ func main() {
 
 		//os.WriteFile("/home/olaf/GolandProjects/pubP", pubP, 0644)
 		logLocal.Info("Trying to use local serverkeys...")
-		pubP, err := os.ReadFile("/home/olaf/GolandProjects/protocolX/pki/pubP")
-		privP, err := os.ReadFile("/home/olaf/GolandProjects/protocolX/pki/privP")
+		pubP, err := os.ReadFile("/home/debajyoti/Documents/protocolX/pki/pubP")
+		privP, err := os.ReadFile("/home/debajyoti/Documents/protocolX/pki/privP")
 
 		if err != nil {
 			logLocal.Info("Reading serverkeys from file failed, generating new keys.")

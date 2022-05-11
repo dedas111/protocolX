@@ -16,7 +16,7 @@ package clientCore
 
 import (
 	"github.com/dedas111/protocolX/config"
-	sphinx "github.com/dedas111/protocolX/sphinx"
+	sphinx "github.com/dedas111/protocolX/sphinx2"
 
 	"github.com/stretchr/testify/assert"
 

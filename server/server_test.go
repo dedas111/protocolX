@@ -20,7 +20,8 @@ import (
 	helpers "github.com/dedas111/protocolX/helpers"
 	"github.com/dedas111/protocolX/node"
 	"github.com/dedas111/protocolX/pki"
-	"github.com/dedas111/protocolX/sphinx"
+	sphinx "github.com/dedas111/protocolX/sphinx2"
+	// "github.com/dedas111/protocolX/sphinx"
 	"github.com/stretchr/testify/assert"
 	mrand "math/rand"
 
@@ -59,14 +60,14 @@ var packetCountTest int
 var tsStart time.Time
 var tsDone time.Time
 
-var listOfComputeIPs = [...]string{"1.2.3.4"}
+var listOfComputeIPs = [...]string{"10.46.234.198"}
 
 const (
 	testDatabase       = "testDatabase.db"
-	remoteIP           = "192.168.178.84" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
-	localIP            = "192.168.178.84" // IP of the client receiving the packets for the tests
-	threadsCountClient = 4                // listener threads on client
-	threadsCountServer = 4                // listener threads on compute/server
+	remoteIP           = "10.46.234.198" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
+	localIP            = "10.46.234.198" // IP of the client receiving the packets for the tests
+	threadsCountClient = 4               // listener threads on client
+	threadsCountServer = 4               // listener threads on compute/server
 )
 
 func createTestServer() (*Server, error) {
@@ -346,7 +347,7 @@ func TestProviderServer_HandleAssignRequest(t *testing.T) {
 
 func createTlsConnection(port int, t *testing.T) net.Conn {
 	t.Log("Before client loadkeys")
-	cert, err := tls.LoadX509KeyPair("/home/olaf/certs/client.pem", "/home/olaf/certs/client.key")
+	cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/client.pem", "/home/debajyoti/Documents/protocolX/certs/client.key")
 	if err != nil {
 		t.Log("server: loadkeys")
 		return nil
@@ -357,18 +358,19 @@ func createTlsConnection(port int, t *testing.T) net.Conn {
 	conn, err := tls.Dial("tcp", ip+":"+strconv.Itoa(port), &config)
 	if conn == nil {
 		t.Log("Conn is nil")
+		t.Log(err)
 		// retunr nil
 	}
 	// defer conn.Close()
 	fmt.Println("client: connected to: ", conn.RemoteAddr())
-	/*
-		state := conn.ConnectionState()
-		for _, v := range state.PeerCertificates {
-			fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
-			fmt.Println(v.Subject)
-		}
-		t.Log("client: handshake: ", state.HandshakeComplete)
-		t.Log("client: mutual: ", state.NegotiatedProtocolIsMutual)
+	/*TestServer_TlsMemoryLoad
+	state := conn.ConnectionState()
+	for _, v := range state.PeerCertificates {
+		fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
+		fmt.Println(v.Subject)
+	}
+	t.Log("client: handshake: ", state.HandshakeComplete)
+	t.Log("client: mutual: ", state.NegotiatedProtocolIsMutual)
 	*/
 	// message := "Hello\n"
 	// n, err := io.WriteString(conn, message)
@@ -381,7 +383,7 @@ func createTlsConnection(port int, t *testing.T) net.Conn {
 
 func createTlsConnectionToIndividual(ip string, port int, t *testing.T) net.Conn {
 	t.Log("Before client loadkeys")
-	cert, err := tls.LoadX509KeyPair("/home/olaf/certs/client.pem", "/home/olaf/certs/client.key")
+	cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/client.pem", "/home/debajyoti/Documents/protocolX/certs/client.key")
 	if err != nil {
 		t.Log("server: loadkeys")
 		return nil
@@ -428,7 +430,7 @@ func TestServer_TlsConnectionReceive(t *testing.T) {
 	for i := 0; i < threadsCount; i++ {
 		t.Log("After the server starts")
 		// time.Sleep(20 * time.Millisecond)
-		port := 9960 + i
+		port := 9900 + i
 		connections[i] = createTlsConnection(port, t)
 		if connections[i] == nil {
 			t.Log("Conn is nil")
@@ -481,13 +483,13 @@ func TestServer_TlsMemoryLoad(t *testing.T) {
 	// time.Sleep(300 * time.Millisecond)
 	// localServer.startTlsServer()
 
-	threadsCount = 100
+	threadsCount = 4
 	var connections = make([]net.Conn, threadsCount)
 
 	for i := 0; i < threadsCount; i++ {
 		t.Log("After the server starts")
 		// time.Sleep(20 * time.Millisecond)
-		port := 9960 + i
+		port := 9900 + i
 		connections[i] = createTlsConnection(port, t)
 		if connections[i] == nil {
 			t.Log("Conn is nil")
@@ -559,8 +561,9 @@ func TestServer_SphinxPacketSize(t *testing.T) {
 
 // TestServer_CheckMultipleFunnels
 // run integrationtest_preparation first!
+/*
 func TestServer_CheckMultipleFunnels(t *testing.T) {
-	db, err := pki.OpenDatabase("/home/olaf/GolandProjects/protocolX/"+PKI_DIR, "sqlite3")
+	db, err := pki.OpenDatabase("/home/debajyoti/Documents/protocolX/"+PKI_DIR, "sqlite3")
 	if err != nil {
 		panic(err)
 	}
@@ -577,6 +580,8 @@ func TestServer_CheckMultipleFunnels(t *testing.T) {
 
 	// Create Message and send it to funnel using compute node
 }
+
+*/
 
 // this test sends sphinx encrypted packets to servers and expects them to answer using a listener
 func TestServer_EndToEndStandalone(t *testing.T) {
@@ -609,7 +614,7 @@ func TestServer_EndToEndStandalone(t *testing.T) {
 		testPackages[i] = make([][]byte, threadsCountServer)
 	}
 	for j, ip := range listOfComputeIPs {
-		for i := 0; i < threadsCountClient; i++ {
+		for i := 0; i < threadsCountServer; i++ {
 			sphinxPacket := createStaticTestPacketWithPortForIndividual(t, "hello world", ip, strconv.Itoa(initialListenPort+i))
 			bSphinxPacket, err := proto.Marshal(sphinxPacket)
 			if err != nil {
@@ -652,6 +657,7 @@ func TestServer_EndToEndStandalone(t *testing.T) {
 }
 
 // run only if the server accepts unencrypted packets
+/*
 func TestServer_Unencrypted(t *testing.T) {
 	go createTestTLSListener(t)
 
@@ -701,56 +707,7 @@ func TestServer_Unencrypted(t *testing.T) {
 //		computePacket := config.ComputePacket{NextHop: "", Data: []byte(strconv.Itoa(ctr))}
 //		bComputePacket, err := proto.Marshal(&computePacket)
 
-// this test sends sphinx encrypted packets (increaing the payload of each packet to use unique packets) to servers and expects them to answer using a listener
-func TestServer_EndToEndVariousPacket(t *testing.T) {
-	go createTestTLSListener(t)
-
-	var connections = make([]net.Conn, threadsCountServer)
-
-	for i := 0; i < threadsCountServer; i++ {
-		//t.Log("After the server starts")
-		fmt.Println("After the server starts")
-		port := 9900 + i // compute node acts as provider (takes client messages)
-		connections[i] = createTlsConnection(port, t)
-		if connections[i] == nil {
-			t.Log("Conn is nil")
-		}
-		t.Log("After the TLS connection is established")
-		time.Sleep(30 * time.Millisecond)
-	}
-
-	totalPackets := 100 // sent per Client Thread
-	t.Log("Timestamp before sending starts : ", time.Now())
-
-	//countPackets := 0
-	initialListenPort := 50000
-	var waitgroup sync.WaitGroup
-	for j := 0; j < threadsCountServer; j++ {
-		waitgroup.Add(1)
-		conn := connections[j]
-		go func(connection net.Conn, index int) {
-			defer waitgroup.Done()
-			for i := 0; i < totalPackets; i++ {
-				//for countPackets < totalPackets {
-				sphinxPacket := createStaticTestPacketWithPort(t, strconv.Itoa(i), strconv.Itoa(initialListenPort+i))
-				bSphinxPacket, err := proto.Marshal(sphinxPacket)
-				if err != nil {
-					t.Fatal(err)
-				}
-				_, err = connection.Write(bSphinxPacket)
-				if err != nil {
-					t.Log("There is an error : ", err)
-				}
-				//countPackets++
-				//t.Log(countPackets)
-			}
-		}(conn, j)
-	}
-	waitgroup.Wait()
-	t.Log("Timestamp after the packets have all been sent: ", time.Now())
-	// sleep timer to keep listener alive
-	time.Sleep(35000000000)
-}
+*/
 
 func TestServer_AddPacketsAndRearrange(t *testing.T) {
 	packetCount := 1000
@@ -841,7 +798,7 @@ func TestServer_AddPacketsAndRearrange(t *testing.T) {
 
 func createTestTLSListener(t *testing.T) error {
 	receivedPackets := 0
-	cert, err := tls.LoadX509KeyPair("/home/olaf/certs/server.pem", "/home/olaf/certs/server.key")
+	cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/server.pem", "/home/debajyoti/Documents/protocolX/certs/server.key")
 	if err != nil {
 		t.Error("test: loadkeys error: ", err)
 		panic(err)
@@ -939,7 +896,7 @@ func bToMb(b uint64) uint64 {
 // }
 
 func createTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
-	db, err := pki.OpenDatabase("/home/olaf/GolandProjects/protocolX/"+PKI_DIR, "sqlite3")
+	db, err := pki.OpenDatabase("//home/debajyoti/Documents/protocolX/"+PKI_DIR, "sqlite3")
 	if err != nil {
 		panic(err)
 	}
@@ -975,7 +932,7 @@ func createLargeTestPacket(t *testing.T, payload string) *sphinx.SphinxPacket {
 
 func createTestPacketForDynamicFunnels(t *testing.T, payload string) *sphinx.SphinxPacket {
 	funnels := helpers.GetCurrentFunnelNodes(globalNodeCount)
-	db, err := pki.OpenDatabase("/home/olaf/GolandProjects/protocolX/"+PKI_DIR, "sqlite3")
+	db, err := pki.OpenDatabase("/home/debajyoti/Documents/protocolX/"+PKI_DIR, "sqlite3")
 	if err != nil {
 		panic(err)
 	}
@@ -1009,7 +966,7 @@ func createTestPacketForDynamicFunnels(t *testing.T, payload string) *sphinx.Sph
 
 func createStaticTestPacketWithPort(t *testing.T, payload string, port string) *sphinx.SphinxPacket {
 	var computeConfig config.MixConfig
-	pubP, _ := os.ReadFile("/home/olaf/GolandProjects/protocolX/pki/pubP")
+	pubP, _ := os.ReadFile("/home/debajyoti/Documents/protocolX/pki/pubP")
 	computeConfig.Id = "1"
 	computeConfig.Port = "9900"
 	computeConfig.Host = remoteIP
@@ -1029,7 +986,7 @@ func createStaticTestPacketWithPort(t *testing.T, payload string, port string) *
 
 func createStaticTestPacketWithPortForIndividual(t *testing.T, payload string, ip string, port string) *sphinx.SphinxPacket {
 	var computeConfig config.MixConfig
-	pubP, _ := os.ReadFile("/home/olaf/GolandProjects/protocolX/pki/pubP")
+	pubP, _ := os.ReadFile("/home/debajyoti/Documents/protocolX/pki/pubP")
 	computeConfig.Id = "1"
 	computeConfig.Port = "9900"
 	computeConfig.Host = ip
