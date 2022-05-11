@@ -16,6 +16,9 @@ package sphinx2
 
 import (
 	"github.com/dedas111/protocolX/config"
+	"runtime"
+	"strconv"
+	"sync"
 	"time"
 
 	"crypto/aes"
@@ -41,7 +44,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestExpoSingleValue(t *testing.T) {
-	pub, _, err := GenerateKeyPair() 
+	pub, _, err := GenerateKeyPair()
 
 	if err != nil {
 		t.Error(err)
@@ -70,17 +73,16 @@ func TestExpoSingleValue(t *testing.T) {
 	// }
 
 	// fmt.Println("Timestamp before marshalling: ", time.Now())
-	
+
 	// randomPoint := elliptic.Marshal(curve, x, y)
 
 	// fmt.Println("Timestamp before second exponentiation: ", time.Now())
 	// expectedX, expectedY := curve.ScalarMult(x, y, nBig.Bytes())
 	// fmt.Println("Timestamp after second exponentiation: ", time.Now())
-	
+
 	// assert.Equal(t, elliptic.Marshal(curve, expectedX, expectedY), result)
 
 }
-
 
 // Do not run this test...
 // func TestActuallyGenrateFuckingKeyPair(t *testing.T) {
@@ -139,7 +141,7 @@ func TestComputeBlindingFactor(t *testing.T) {
 
 	key := hash(x)
 	b, err := computeBlindingFactor(key)
-	
+
 	if err != nil {
 		t.Error(err)
 	}
@@ -193,7 +195,6 @@ func TestGetSharedSecrets(t *testing.T) {
 	// x := big.NewInt(100)
 	// x, err := GenerateKeyPair()
 	x, err := randomBigIntBytes()
-
 
 	if err != nil {
 		t.Error(err)
@@ -268,7 +269,6 @@ func TestGetSharedSecrets(t *testing.T) {
 
 	assert.Equal(t, expected, result)
 }
-
 
 func TestEncapsulateHeader(t *testing.T) {
 
@@ -352,7 +352,6 @@ func TestEncapsulateHeader(t *testing.T) {
 
 	assert.Equal(t, expectedHeader, actualHeader)
 }
-
 
 func TestProcessSphinxHeader(t *testing.T) {
 
@@ -485,6 +484,48 @@ func TestProcessSphinxPayload(t *testing.T) {
 	assert.Equal(t, []byte(message), decMsg)
 }
 
+func TestProcessSphinxPacketWithoutCryptoBenchmark(t *testing.T) {
+	threshold := 5500
+	c := Commands{Delay: 0.1}
+	message := "Plaintext message"
+
+	routing := RoutingInfo{NextHop: &Hop{"DestinationId", "DestinationAddress", []byte{}}, RoutingCommands: &c,
+		NextHopMetaData: []byte{}, Mac: []byte{}}
+
+	routingBytes, err := proto.Marshal(&routing)
+	if err != nil {
+		t.Error(err)
+	}
+
+	var packet SphinxPacket
+	packet.Hdr = &Header{[]byte{}, routingBytes, []byte{}}
+	packet.Pld = []byte(message)
+
+	packetBytes, _ := proto.Marshal(&packet)
+
+	tsStart := time.Now()
+	threadCount := runtime.GOMAXPROCS(0)
+	var waitgroup sync.WaitGroup
+	fmt.Println("Processing starting on " + strconv.Itoa(threadCount) + " threads with " + strconv.Itoa(threshold) + " packets each.")
+
+	for j := 0; j < threadCount; j++ {
+		waitgroup.Add(1)
+		go func(packet []byte, threshold int) {
+			defer waitgroup.Done()
+			for i := 0; i < threshold; i++ {
+				ProcessSphinxPacketWithoutCrypto(packetBytes)
+				if err != nil {
+					t.Error(err)
+				}
+			}
+		}(packetBytes, threshold)
+	}
+	waitgroup.Wait()
+	dur := time.Now().Sub(tsStart)
+	fmt.Println("Processing took " + dur.String())
+	assert.True(t, dur < time.Second)
+}
+
 func TestOnionEncryptThenDecrypt(t *testing.T) {
 	pub1, priv1, err := GenerateKeyPair()
 	pub2, priv2, err := GenerateKeyPair()
@@ -563,7 +604,6 @@ func TestOnionEncryptThenDecrypt(t *testing.T) {
 
 	assert.Equal(t, []byte(message), finalPacket.Pld)
 }
-
 
 func TestOnionEncryptThenDecryptLongMessage(t *testing.T) {
 	pub1, priv1, err := GenerateKeyPair()
@@ -655,9 +695,3 @@ func TestOnionEncryptThenDecryptLongMessage(t *testing.T) {
 
 	assert.Equal(t, []byte(message), finalPacket.Pld)
 }
-
-
-
-
-
-
