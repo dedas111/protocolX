@@ -160,7 +160,7 @@ func (p *Server) run() {
 		for {
 			select {
 			case <-d.C:
-				time.Sleep(200)
+				time.Sleep(20 * time.Millisecond)
 				p.sendOutboundFunnelMessages()
 				//p.setCurrentRole()
 			}
@@ -457,7 +457,8 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 		conn, pres := p.connectionsToCompute[dstAddr]
 
 		if !pres {
-			cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs2/client.pem", "/home/ec2-user/GolandProjects/protocolX/certs2/client.key")
+			logLocal.Info("funnel node: Connection to compute not found for " + dstAddr + ". Creating new one.")
+			cert, err := tls.LoadX509KeyPair("/home/olaf/GolandProjects/protocolX/certs2/client.pem", "/home/olaf/GolandProjects/protocolX/certs2/client.key")
 			if err != nil {
 				logLocal.Info("compute node: loadkeys: ", err)
 			}
@@ -473,6 +474,7 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 				logLocal.Error("Error sending packet to compute.", err)
 			}
 		} else {
+			logLocal.Info("funnel node: Connection to compute found for " + dstAddr + ".")
 			_, err := conn.Write(computePacket.Data)
 			if err != nil {
 				logLocal.Error("Error sending packet to compute.", err)
