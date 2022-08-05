@@ -364,13 +364,13 @@ func createTlsConnection(port int, t *testing.T) net.Conn {
 	// defer conn.Close()
 	fmt.Println("client: connected to: ", conn.RemoteAddr())
 	/*TestServer_TlsMemoryLoad
-		state := conn.ConnectionState()
-		for _, v := range state.PeerCertificates {
-			fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
-			fmt.Println(v.Subject)
-		}
-		t.Log("client: handshake: ", state.HandshakeComplete)
-		t.Log("client: mutual: ", state.NegotiatedProtocolIsMutual)
+	state := conn.ConnectionState()
+	for _, v := range state.PeerCertificates {
+		fmt.Println(x509.MarshalPKIXPublicKey(v.PublicKey))
+		fmt.Println(v.Subject)
+	}
+	t.Log("client: handshake: ", state.HandshakeComplete)
+	t.Log("client: mutual: ", state.NegotiatedProtocolIsMutual)
 	*/
 	// message := "Hello\n"
 	// n, err := io.WriteString(conn, message)

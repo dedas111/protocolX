@@ -757,7 +757,7 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 	server.connections = make(map[int][]*tls.Conn)
 	server.connectionsToCompute = make(map[string]*tls.Conn)
 
-	threadsCount = runtime.NumCPU() * 2
+	threadsCount = runtime.NumCPU()
 	//logLocal.Info("Starting server with logical cores: ", threadsCount)
 
 	// prevent server from adding its config multiple times to database
