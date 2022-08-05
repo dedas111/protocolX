@@ -31,7 +31,7 @@ import (
 
 	"crypto/rand"
 	"crypto/tls"
-	"crypto/x509"
+	// "crypto/x509"
 
 	mrand "math/rand"
 	// "bytes"
@@ -62,7 +62,7 @@ var (
 	lbCtr            = 0
 	emptyCtr         = 0
 	numOfFunnels     = 1
-	computeListeners = 4
+	computeListeners = 16
 	funnelListeners  = 16
 
 	logLocal = logging.PackageLogger()
@@ -159,7 +159,7 @@ func (p *Server) run() {
 		for {
 			select {
 			case <-d.C:
-				time.Sleep(200)
+				time.Sleep(200 * time.Millisecond)
 				p.sendOutboundFunnelMessages()
 				//p.setCurrentRole()
 			}
@@ -526,14 +526,14 @@ func (p *Server) startTlsServer() error {
 				}
 				// defer conn.Close()
 				logLocal.Info("server: accepted from ", conn.RemoteAddr())
-				tlscon, ok := conn.(*tls.Conn)
-				if ok {
-					logLocal.Info("ok=true")
-					state := tlscon.ConnectionState()
-					for _, v := range state.PeerCertificates {
-						logLocal.Info(x509.MarshalPKIXPublicKey(v.PublicKey))
-					}
-				}
+				// tlscon, ok := conn.(*tls.Conn)
+				// if ok {
+				// 	// logLocal.Info("ok=true")
+				// 	state := tlscon.ConnectionState()
+				// 	// for _, v := range state.PeerCertificates {
+				// 	// 	logLocal.Info(x509.MarshalPKIXPublicKey(v.PublicKey))
+				// 	// }
+				// }
 				go p.handleClient(conn, localIndex)
 				// someIndex++
 			}
@@ -898,7 +898,8 @@ func (p *Server) setCurrentRole() {
 func (p *Server) sendOutboundFunnelMessages() {
 	// reduce dimension of outbound packet array
 	outboundPackets := p.rearrangeReceivedPackets()
-	//logLocal.Info("Outbound packets: ", len(outboundPackets))
+	logLocal.Info("Outbound packets: ", len(outboundPackets))
+	logLocal.Info("System time now: ", time.Now())
 	if len(outboundPackets) > 0 {
 		// relay packets here if funnel
 		if isMapper {
@@ -906,7 +907,7 @@ func (p *Server) sendOutboundFunnelMessages() {
 				p.relayPacketAsFunnel(packet)
 				relayedPackets++
 			}
-			logLocal.Info("Sent all outbound packages as funnel.")
+			logLocal.Info("Sent all as funnel. Time: " , time.Now())
 			logLocal.Info("Relayed packets: ", relayedPackets)
 		}
 	}

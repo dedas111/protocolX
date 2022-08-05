@@ -278,7 +278,7 @@ func getSharedSecretsBytes(curve elliptic.Curve, nodes []config.MixConfig, initi
 
 		blindFactors = append(blindFactors, blinder)
 		tuples = append(tuples, HeaderInitials{Alpha: alpha, Secret: s, Blinder: blinder, SecretHash: aes_s})
-		logLocal.Info("The HeaderInitials: ", HeaderInitials{Alpha: alpha, Secret: s, Blinder: blinder, SecretHash: aes_s})
+		// logLocal.Info("The HeaderInitials: ", HeaderInitials{Alpha: alpha, Secret: s, Blinder: blinder, SecretHash: aes_s})
 	}
 	return tuples, nil
 
