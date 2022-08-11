@@ -65,6 +65,8 @@ var (
 	computeListeners = 16
 	funnelListeners  = 16
 
+	// clientAddr       = "10.20.30.40:65"
+
 	logLocal = logging.PackageLogger()
 )
 
@@ -98,8 +100,9 @@ type Server struct {
 	receivedPackets     [][][]byte
 	indexSinceLastRelay []int // used by funnel to determine which packets are new
 
-	connections          map[int][]*tls.Conn  // TLS connection to funnels
-	connectionsToCompute map[string]*tls.Conn // TLS connection to compute nodes
+	connections          map[int][]*tls.Conn  // TLS connections to funnels
+	connectionsToCompute map[string]*tls.Conn // TLS connections to compute nodes
+	connectionsToClients map[string]*tls.Conn // TLS connections to clients
 }
 
 type ClientRecord struct {
@@ -206,7 +209,7 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 			}
 		*/
 	} else { //compute node functionality
-		logLocal.Info("compute functionality")
+		// logLocal.Info("compute functionality")
 		funnelId := p.establishConnectionToRandomFunnel()
 
 		newPacket, err := p.ProcessPacketInSameThread(packet)
@@ -217,17 +220,49 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 		//var compPacket config.ComputePacket
 		//proto.Unmarshal(packet, &compPacket)
 
-		computePacket := config.ComputePacket{Data: newPacket.Data, NextHop: newPacket.Adr.Address}
+		dstAddr := newPacket.Adr.Address
+		computePacket := config.ComputePacket{Data: newPacket.Data, NextHop: dstAddr}
 
 		// forward to random active funnel node
-		//if newPacket.Flag == "\xF1" {
-		p.forwardPacketToFunnel(computePacket, funnelId)
-		logLocal.Info("ComputePacket - Adress: ", computePacket.NextHop)
-		relayedPackets++
-		//} else {
-		//	logLocal.Info("Server: Packet has non-forward flag. Packet dropped")
-		//}
+		if newPacket.Flag == "\xF1" {
+			p.forwardPacketToFunnel(computePacket, funnelId)
+			// logLocal.Info("ComputePacket - Adress: ", computePacket.NextHop)
+			relayedPackets++
+		} else {
+			logLocal.Info("Server: Packet has non-forward flag. Packet will be delivered.")
+			// save connection to map if it doesn't exist
+			p.mutex.Lock()
+			conn, pres := p.connectionsToClients[dstAddr]
+
+			if !pres {
+				cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/client.pem", "/home/debajyoti/Documents/protocolX/certs/client.key")
+				if err != nil {
+					logLocal.Info("compute node: loadkeys: ", err)
+				}
+				config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true, MinVersion: 2}
+				conn, err := tls.Dial("tcp", dstAddr, &config)
+				if err != nil {
+					logLocal.Error("Couldn't create TLS connection with peer.", dstAddr)
+					logLocal.Error(err)
+				}
+				p.connectionsToClients[dstAddr] = conn
+				conn.Write(newPacket.Data)
+				if err != nil {
+					logLocal.Error("Error sending packet to compute.", err)
+				}
+				messageDelivered++
+			} else {
+				_, err := conn.Write(newPacket.Data)
+				if err != nil {
+					logLocal.Error("Error sending packet to compute.", err)
+				}
+			}
+			p.mutex.Unlock()
+
+		}
+		logLocal.Info("-------------------------------------------------------------")
 		logLocal.Info("Relayed packets: ", relayedPackets)
+		logLocal.Info("Delivered packets: ", messageDelivered)
 		logLocal.Info("-------------------------------------------------------------")
 	}
 	// cPac := make(chan node.MixPacket)
@@ -756,6 +791,7 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 	server.assignedClients = make(map[string]ClientRecord)
 	server.connections = make(map[int][]*tls.Conn)
 	server.connectionsToCompute = make(map[string]*tls.Conn)
+	server.connectionsToClients = make(map[string]*tls.Conn)
 
 	threadsCount = runtime.NumCPU()
 	//logLocal.Info("Starting server with logical cores: ", threadsCount)

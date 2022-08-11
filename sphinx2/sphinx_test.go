@@ -16,9 +16,9 @@ package sphinx2
 
 import (
 	"github.com/dedas111/protocolX/config"
-	"runtime"
-	"strconv"
-	"sync"
+	// "runtime"
+	// "strconv"
+	// "sync"
 	"time"
 
 	"crypto/aes"
@@ -484,47 +484,47 @@ func TestProcessSphinxPayload(t *testing.T) {
 	assert.Equal(t, []byte(message), decMsg)
 }
 
-func TestProcessSphinxPacketWithoutCryptoBenchmark(t *testing.T) {
-	threshold := 5500
-	c := Commands{Delay: 0.1}
-	message := "Plaintext message"
+// func TestProcessSphinxPacketWithoutCryptoBenchmark(t *testing.T) {
+// 	threshold := 5500
+// 	c := Commands{Delay: 0.1}
+// 	message := "Plaintext message"
 
-	routing := RoutingInfo{NextHop: &Hop{"DestinationId", "DestinationAddress", []byte{}}, RoutingCommands: &c,
-		NextHopMetaData: []byte{}, Mac: []byte{}}
+// 	routing := RoutingInfo{NextHop: &Hop{"DestinationId", "DestinationAddress", []byte{}}, RoutingCommands: &c,
+// 		NextHopMetaData: []byte{}, Mac: []byte{}}
 
-	routingBytes, err := proto.Marshal(&routing)
-	if err != nil {
-		t.Error(err)
-	}
+// 	routingBytes, err := proto.Marshal(&routing)
+// 	if err != nil {
+// 		t.Error(err)
+// 	}
 
-	var packet SphinxPacket
-	packet.Hdr = &Header{[]byte{}, routingBytes, []byte{}}
-	packet.Pld = []byte(message)
+// 	var packet SphinxPacket
+// 	packet.Hdr = &Header{[]byte{}, routingBytes, []byte{}}
+// 	packet.Pld = []byte(message)
 
-	packetBytes, _ := proto.Marshal(&packet)
+// 	packetBytes, _ := proto.Marshal(&packet)
 
-	tsStart := time.Now()
-	threadCount := runtime.GOMAXPROCS(0)
-	var waitgroup sync.WaitGroup
-	fmt.Println("Processing starting on " + strconv.Itoa(threadCount) + " threads with " + strconv.Itoa(threshold) + " packets each.")
+// 	tsStart := time.Now()
+// 	threadCount := runtime.GOMAXPROCS(0)
+// 	var waitgroup sync.WaitGroup
+// 	fmt.Println("Processing starting on " + strconv.Itoa(threadCount) + " threads with " + strconv.Itoa(threshold) + " packets each.")
 
-	for j := 0; j < threadCount; j++ {
-		waitgroup.Add(1)
-		go func(packet []byte, threshold int) {
-			defer waitgroup.Done()
-			for i := 0; i < threshold; i++ {
-				ProcessSphinxPacketWithoutCrypto(packetBytes)
-				if err != nil {
-					t.Error(err)
-				}
-			}
-		}(packetBytes, threshold)
-	}
-	waitgroup.Wait()
-	dur := time.Now().Sub(tsStart)
-	fmt.Println("Processing took " + dur.String())
-	assert.True(t, dur < time.Second)
-}
+// 	for j := 0; j < threadCount; j++ {
+// 		waitgroup.Add(1)
+// 		go func(packet []byte, threshold int) {
+// 			defer waitgroup.Done()
+// 			for i := 0; i < threshold; i++ {
+// 				ProcessSphinxPacketWithoutCrypto(packetBytes)
+// 				if err != nil {
+// 					t.Error(err)
+// 				}
+// 			}
+// 		}(packetBytes, threshold)
+// 	}
+// 	waitgroup.Wait()
+// 	dur := time.Now().Sub(tsStart)
+// 	fmt.Println("Processing took " + dur.String())
+// 	assert.True(t, dur < time.Second)
+// }
 
 func TestOnionEncryptThenDecrypt(t *testing.T) {
 	pub1, priv1, err := GenerateKeyPair()

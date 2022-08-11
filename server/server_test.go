@@ -60,12 +60,12 @@ var packetCountTest int
 var tsStart time.Time
 var tsDone time.Time
 
-var listOfComputeIPs = [...]string{"192.168.42.215"}
+var listOfComputeIPs = [...]string{"10.45.30.179"}
 
 const (
 	testDatabase       = "testDatabase.db"
-	remoteIP           = "192.168.42.215" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
-	localIP            = "192.168.42.215" // IP of the client receiving the packets for the tests
+	remoteIP           = "10.45.30.179" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
+	localIP            = "10.45.30.179" // IP of the client receiving the packets for the tests
 	threadsCountClient = 4                // listener threads on client
 	threadsCountServer = 4                // listener threads on compute/server
 )
@@ -353,7 +353,7 @@ func createTlsConnection(port int, t *testing.T) net.Conn {
 		return nil
 	}
 	config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
-	//conn, err := tls.Dial("tcp", "192.168.42.215:"+strconv.Itoa(port), &config)
+	//conn, err := tls.Dial("tcp", "10.45.30.179:"+strconv.Itoa(port), &config)
 	ip := remoteIP
 	conn, err := tls.Dial("tcp", ip+":"+strconv.Itoa(port), &config)
 	if conn == nil {
@@ -389,7 +389,7 @@ func createTlsConnectionToIndividual(ip string, port int, t *testing.T) net.Conn
 		return nil
 	}
 	config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
-	//conn, err := tls.Dial("tcp", "192.168.42.215:"+strconv.Itoa(port), &config)
+	//conn, err := tls.Dial("tcp", "10.45.30.179:"+strconv.Itoa(port), &config)
 	conn, err := tls.Dial("tcp", ip+":"+strconv.Itoa(port), &config)
 	if conn == nil {
 		t.Log("Conn is nil")
@@ -780,7 +780,7 @@ func TestServer_Unencrypted(t *testing.T) {
 				//for countPackets < totalPackets {
 				payload := []byte(strconv.Itoa(i))
 				t.Log("Sending packet with id ", i, " and bytes: ", payload)
-				computePacket := config.ComputePacket{NextHop: "192.168.42.215:50000", Data: payload}
+				computePacket := config.ComputePacket{NextHop: "10.45.30.179:50000", Data: payload}
 				bComputePacket, err := proto.Marshal(&computePacket)
 				_, err = connection.Write(bComputePacket)
 				if err != nil {
@@ -823,7 +823,7 @@ func TestServer_AddPacketsAndRearrange(t *testing.T) {
 			defer waitgroup.Done()
 			for i := 0; i < packetCount; i++ {
 				payload := []byte(strconv.Itoa(ctr))
-				computePacket := config.ComputePacket{NextHop: "192.168.42.215:50000", Data: payload}
+				computePacket := config.ComputePacket{NextHop: "10.45.30.179:50000", Data: payload}
 				bComputePacket, err := proto.Marshal(&computePacket)
 				if err != nil {
 					panic(err)
@@ -859,7 +859,7 @@ func TestServer_AddPacketsAndRearrange(t *testing.T) {
 				defer waitgroup.Done()
 				for i := 0; i < packetCount; i++ {
 					payload := []byte(strconv.Itoa(ctr))
-					computePacket := config.ComputePacket{NextHop: "192.168.42.215:50000", Data: payload}
+					computePacket := config.ComputePacket{NextHop: "10.45.30.179:50000", Data: payload}
 					bComputePacket, err := proto.Marshal(&computePacket)
 					if err != nil {
 						panic(err)
