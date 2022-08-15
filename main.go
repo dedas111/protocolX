@@ -205,8 +205,8 @@ func main() {
 
 		//os.WriteFile("/home/olaf/GolandProjects/pubP", pubP, 0644)
 		logLocal.Info("Trying to use local serverkeys...")
-		pubP, err := os.ReadFile("/ec2-user/GolandProjects/Documents/protocolX/pki/pubP")
-		privP, err := os.ReadFile("/ec2-user/GolandProjects/Documents/protocolX/pki/privP")
+		pubP, err := os.ReadFile("/home/ec2-user/GolandProjects/Documents/protocolX/pki/pubP")
+		privP, err := os.ReadFile("/home/ec2-user/GolandProjects/Documents/protocolX/pki/privP")
 
 		if err != nil {
 			logLocal.Info("Reading serverkeys from file failed, generating new keys.")
