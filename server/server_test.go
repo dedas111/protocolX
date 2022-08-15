@@ -61,12 +61,12 @@ var tsStart time.Time
 var tsDone time.Time
 var probingMode int
 
-var listOfComputeIPs = [...]string{"10.45.30.179"}
+var listOfComputeIPs = [...]string{"18.212.178.233"}
 
 const (
 	testDatabase       = "testDatabase.db"
-	remoteIP           = "10.45.30.179" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
-	localIP            = "10.45.30.179" // IP of the client receiving the packets for the tests
+	remoteIP           = "18.212.178.233" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
+	localIP            = "54.91.206.62" // IP of the client receiving the packets for the tests
 	threadsCountClient = 4                // listener threads on client
 	threadsCountServer = 4                // listener threads on compute/server
 )
@@ -851,7 +851,7 @@ func TestServer_AddPacketsAndRearrange(t *testing.T) {
 			defer waitgroup.Done()
 			for i := 0; i < packetCount; i++ {
 				payload := []byte(strconv.Itoa(ctr))
-				computePacket := config.ComputePacket{NextHop: "10.45.30.179:50000", Data: payload}
+				computePacket := config.ComputePacket{NextHop: "54.91.206.62:50000", Data: payload}
 				bComputePacket, err := proto.Marshal(&computePacket)
 				if err != nil {
 					panic(err)
