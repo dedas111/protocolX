@@ -235,7 +235,7 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 			conn, pres := p.connectionsToClients[dstAddr]
 
 			if !pres {
-				cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/client.pem", "/home/debajyoti/Documents/protocolX/certs/client.key")
+				cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs/client.pem", "/home/ec2-user/GolandProjects/protocolX/certs/client.key")
 				if err != nil {
 					logLocal.Info("compute node: loadkeys: ", err)
 				}
@@ -345,7 +345,7 @@ func (p *Server) forwardPacketTLS(sphinxPacket []byte, address string) error {
 	//	return err
 	///}
 
-	cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/client.pem", "/home/debajyoti/Documents/protocolX/certs/client.key")
+	cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs/client.pem", "/home/ec2-user/GolandProjects/protocolX/certs/client.key")
 	if err != nil {
 		logLocal.Info("compute node: loadkeys: ", err)
 	}
@@ -488,7 +488,7 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 		logLocal.Error("Couldn't read port from packet to relay!", err)
 	}
 
-	if nextHopPortInt < 10000 && nextHopPortInt >= 9900 { // hardcoded portrange for protocol for now
+	if nextHopPortInt < 50000 && nextHopPortInt >= 9900 { // hardcoded portrange for protocol for now
 		dstAddr := dstIp + strconv.Itoa(nextHopPortInt+lbCtr)
 		// for this to work, every server has to have the same amount of threads
 		lbCtr = (lbCtr + 1) % computeListeners
@@ -497,7 +497,7 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 		conn, pres := p.connectionsToCompute[dstAddr]
 
 		if !pres {
-			cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/client.pem", "/home/debajyoti/Documents/protocolX/certs/client.key")
+			cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs/client.pem", "/home/ec2-user/GolandProjects/protocolX/certs/client.key")
 			if err != nil {
 				logLocal.Info("compute node: loadkeys: ", err)
 			}
@@ -531,7 +531,7 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 // startTlsServer() opens multiple TLS listeners on multiple ports starting with the port given during server start.
 // The amount pf listeners depends on thread count.
 func (p *Server) startTlsServer() error {
-	cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/server.pem", "/home/debajyoti/Documents/protocolX/certs/server.key")
+	cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs/server.pem", "/home/ec2-user/GolandProjects/protocolX/certs/server.key")
 	if err != nil {
 		// log.Fatalf("server: loadkeys: %s", err)
 		logLocal.Info("server: loadkeys: ", err)
@@ -863,7 +863,7 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 		err = proto.Unmarshal(results, &mixConfig)
 
 		// establish a connection with them using all available ports stated by threadsCount
-		cert, err := tls.LoadX509KeyPair("/home/debajyoti/Documents/protocolX/certs/client.pem", "/home/debajyoti/Documents/protocolX/certs/client.key")
+		cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs/client.pem", "/home/ec2-user/GolandProjects/protocolX/certs/client.key")
 		if err != nil {
 			logLocal.Info("compute node: loadkeys: ", err)
 		}
