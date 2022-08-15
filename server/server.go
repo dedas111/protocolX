@@ -229,7 +229,7 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 			// logLocal.Info("ComputePacket - Adress: ", computePacket.NextHop)
 			relayedPackets++
 		} else {
-			logLocal.Info("Server: Packet has non-forward flag. Packet will be delivered.")
+			// logLocal.Info("Server: Packet has non-forward flag. Packet will be delivered.")
 			// save connection to map if it doesn't exist
 			p.mutex.Lock()
 			conn, pres := p.connectionsToClients[dstAddr]
@@ -248,22 +248,28 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 				p.connectionsToClients[dstAddr] = conn
 				conn.Write(newPacket.Data)
 				if err != nil {
-					logLocal.Error("Error sending packet to compute.", err)
+					logLocal.Error("Error sending packet to client.", err)
 				}
-				messageDelivered++
+				// messageDelivered++
 			} else {
 				_, err := conn.Write(newPacket.Data)
 				if err != nil {
-					logLocal.Error("Error sending packet to compute.", err)
+					logLocal.Error("Error sending packet to client.", err)
 				}
 			}
+
+			// _, err := conn.Write(newPacket.Data)
+			// if err != nil {
+			// 	logLocal.Error("Error sending packet to client.", err)
+			// }
+			messageDelivered++
 			p.mutex.Unlock()
 
 		}
-		logLocal.Info("-------------------------------------------------------------")
-		logLocal.Info("Relayed packets: ", relayedPackets)
-		logLocal.Info("Delivered packets: ", messageDelivered)
-		logLocal.Info("-------------------------------------------------------------")
+		// logLocal.Info("-------------------------------------------------------------")
+		// logLocal.Info("Relayed packets: ", relayedPackets)
+		// logLocal.Info("Delivered packets: ", messageDelivered)
+		// logLocal.Info("-------------------------------------------------------------")
 	}
 	// cPac := make(chan node.MixPacket)
 	// errCh := make(chan error)
@@ -368,15 +374,15 @@ func (p *Server) forwardPacketToFunnel(computePacket config.ComputePacket, funne
 	}
 
 	randPort := mrand.Int31n(int32(funnelListeners - 1))
-	logLocal.Info("Server: Forwarding sphinx packet to funnel with id and port: ", funnelId, randPort)
+	// logLocal.Info("Server: Forwarding sphinx packet to funnel with id and port: ", funnelId, randPort)
 	if p.connections[funnelId][randPort] == nil {
-		time.Sleep(time.Millisecond * 650)
+		time.Sleep(time.Millisecond * 30)
 	}
 	p.connections[funnelId][randPort].Write(packetBytes)
 	if err != nil {
 		return err
 	}
-	logLocal.Info("Server: Forwarded sphinx packet to funnel with id and port: ", funnelId, randPort)
+	// logLocal.Info("Server: Forwarded sphinx packet to funnel with id and port: ", funnelId, randPort)
 	return nil
 }
 
@@ -836,7 +842,7 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 
 	// --- THIS HAS TO BE REMOVED AFTERWARDS ---
 
-	logLocal.Info("funnelId: ", funnelId)
+	// logLocal.Info("funnelId: ", funnelId)
 	// check if there already exists a connection to that funnel
 	_, pres := p.connections[funnelId]
 	if !pres {
@@ -932,19 +938,27 @@ func (p *Server) setCurrentRole() {
 // It sends out collected packets to their next hop without removing a layer of crypto.
 // Before sending, the function checks if the node is actually a funnel node and if there are packets to send.
 func (p *Server) sendOutboundFunnelMessages() {
-	// reduce dimension of outbound packet array
-	outboundPackets := p.rearrangeReceivedPackets()
-	logLocal.Info("Outbound packets: ", len(outboundPackets))
-	logLocal.Info("System time now: ", time.Now())
-	if len(outboundPackets) > 0 {
-		// relay packets here if funnel
-		if isMapper {
-			for _, packet := range outboundPackets {
-				p.relayPacketAsFunnel(packet)
-				relayedPackets++
+	if isMapper {
+		// reduce dimension of outbound packet array
+		outboundPackets := p.rearrangeReceivedPackets()
+		logLocal.Info("Outbound packets: ", len(outboundPackets))
+		logLocal.Info("System time now: ", time.Now())
+		if len(outboundPackets) > 0 {
+			// relay packets here if funnel
+			if isMapper {
+				for _, packet := range outboundPackets {
+					p.relayPacketAsFunnel(packet)
+					relayedPackets++
+				}
+				logLocal.Info("Sent all as funnel. Time: " , time.Now())
+				logLocal.Info("Relayed packets: ", relayedPackets)
 			}
-			logLocal.Info("Sent all as funnel. Time: " , time.Now())
-			logLocal.Info("Relayed packets: ", relayedPackets)
 		}
+	} else {
+		logLocal.Info("-------------------------------------------------------------")
+		logLocal.Info("Relayed packets: ", relayedPackets)
+		logLocal.Info("Delivered packets: ", messageDelivered)
+		logLocal.Info("System time now: ", time.Now())
+		logLocal.Info("-------------------------------------------------------------")
 	}
 }

@@ -80,7 +80,7 @@ func GetRound() int64 {
 // GetRemainingRoundTime
 // Returns the remaining round time in milliseconds/*
 func GetRemainingRoundTime() int64 {
-	return time.Now().UnixMilli() % RoundDuration.Milliseconds()
+	return 1000 - time.Now().UnixMilli() % RoundDuration.Milliseconds()
 }
 
 func GetReferenceCharacter(index int64) int64 {

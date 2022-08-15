@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"crypto/elliptic"
+	mrand "math/rand"
 	
 	"os"
 	"reflect"
@@ -30,7 +31,8 @@ import (
 	"sync"
     "time"
 	"testing"
-	// "strconv"
+	"strconv"
+	"runtime"
 )
 
 var nodes []config.MixConfig
@@ -46,7 +48,10 @@ func createProviderWorker() (*Mix, error) {
 
 func createTestPacket(curve elliptic.Curve, mixes []config.MixConfig, provider config.MixConfig, recipient config.ClientConfig) (*sphinx.SphinxPacket, error) {
 	path := config.E2EPath{IngressProvider: provider, Mixes: mixes, EgressProvider: provider, Recipient: recipient}
-	testPacket, err := sphinx.PackForwardMessage(curve, path, []float64{1.4, 2.5, 2.3, 3.2, 7.4}, "Test Message")
+	message := "I have to write a long plaintext message, but I do not know what to write. So I start writing this story of a programmer who wanted to implement Sphinx packet structure in Golang. But Golang is not easy -- it has a lot of weird datatype. He wanted to give up many times, but he did not. Finally he succeed. He succeed to implement the Sphinx packet structure in Golang. Now he is happy."
+	randId := mrand.Intn(4528548658767861431)
+
+	testPacket, err := sphinx.PackForwardMessage(curve, path, []float64{1.4, 2.5, 2.3, 3.2, 7.4}, message + strconv.Itoa(randId) )
 	if err != nil {
 		return nil, err
 	}
@@ -125,8 +130,8 @@ func TestMix_BatchProcessPacket(t *testing.T) {
 	if testing.Short() {
         t.Skip("skipping test in short mode.")
     }
-	// threads := runtime.GOMAXPROCS(0) -1
-	// fmt.Println("test: the total number of threads used : ", threads)
+	threads := runtime.GOMAXPROCS(6)
+	t.Log("test: the total number of threads used : ", threads)
 	// logLocal.Info("main: case client:  the total number of threads used : ", threads)
 
 	pubD, _, err := sphinx.GenerateKeyPair()
@@ -145,7 +150,7 @@ func TestMix_BatchProcessPacket(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testSizes := []int{100, 200, 300, 400, 500, 600, 800, 1000, 1200, 1400, 1500, 1600, 1800, 2000, 2500, 3000}
+	testSizes := []int{100, 1000, 2000, 3000}
 	// testSizes := []int{2}
 	for _, testSize := range testSizes {	
 		// testSize := 2
@@ -205,6 +210,97 @@ func TestMix_BatchProcessPacket(t *testing.T) {
 		t.Log("Timestamp after the testrun ends : ", time.Now())
 	}
 }
+
+
+func TestMix_BatchProcessPacketInSingleThread(t *testing.T) {
+	if testing.Short() {
+        t.Skip("skipping test in short mode.")
+    }
+	// threads := runtime.GOMAXPROCS(0) -1
+	// fmt.Println("test: the total number of threads used : ", threads)
+	// logLocal.Info("main: case client:  the total number of threads used : ", threads)
+
+	pubD, _, err := sphinx.GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	providerWorker, err := createProviderWorker()
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := config.MixConfig{Id: "Provider", Host: "localhost", Port: "3333", PubKey: providerWorker.pubKey}
+	dest := config.ClientConfig{Id: "Destination", Host: "localhost", Port: "3334", PubKey: pubD, Provider: &provider}
+	mixes, err := createTestMixes()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testSizes := []int{100, 1000, 2000, 3000}
+	// testSizes := []int{2}
+	for _, testSize := range testSizes {	
+		// testSize := 2
+		fmt.Println("test:  batch size : ", testSize)
+		// localServer.aPac = make([]node.MixPacket, testSize, testSize)
+	
+		var waitgroup sync.WaitGroup
+	
+		dummyQueue := make([][]byte, testSize)
+		for j:=0; j<testSize; j++ {
+			waitgroup.Add(1)
+			position := j
+			go func(index int) {
+				defer waitgroup.Done()
+				// payload := strconv.Itoa(97)
+				sphinxPacket, err := createTestPacket(elliptic.P224(), mixes, provider, dest)
+				if err != nil {
+					t.Fatal(err)
+				}
+				bSphinxPacket, err := proto.Marshal(sphinxPacket)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// dummyQueue = append(dummyQueue, bSphinxPacket)
+				dummyQueue[index] = bSphinxPacket
+				// logLocal.Info("dummyQueue is appended with message number ", i)
+			} (position)
+		} 
+		waitgroup.Wait()
+	
+		// var wg sync.WaitGroup
+		//lengthAtStart := len(dummyQueue)
+		// wg.Add(testSize)
+		t.Log("Timestamp before the testrun starts : ", time.Now())
+		// fmt.Println("test: total messages processed : ", len(localServer.aPac))
+	
+		for i := 0; i<testSize; i++ {
+			index := i
+			_, err := providerWorker.ProcessPacketInSameThread(dummyQueue[index])
+			if err != nil {
+				t.Fatal(err)
+			}
+			// go func(position int) {
+			// 	// defer wg.Done()
+			// 	// dummyPacket <- dummyQueue
+			// 	// if dummyPacket == nil {
+			// 	// 	t.Fatalf("Something wrong brother, why is the channel empty!")
+			// 	// }
+			// 	_, err := providerWorker.ProcessPacketInSameThread(dummyQueue[position])
+			// 	if err != nil {
+			// 		t.Fatal(err)
+			// 	}
+			// } (index)
+			// err = localServer.receivedPacket(bSphinxPacket)
+			// if err != nil {
+			// 	t.Fatal(err)
+			// }
+		}
+	
+		// wg.Wait()
+		t.Log("Timestamp after the testrun ends : ", time.Now())
+	}
+}
+
 
 func TestMix_Shuffle(t *testing.T) {
 	providerWorker, err := createProviderWorker()

@@ -59,6 +59,7 @@ var curve = elliptic.P224()
 var packetCountTest int
 var tsStart time.Time
 var tsDone time.Time
+var probingMode int
 
 var listOfComputeIPs = [...]string{"10.45.30.179"}
 
@@ -675,7 +676,7 @@ func TestServer_FunnelCapacity(t *testing.T) {
 
 // this test sends sphinx encrypted packets to servers and expects them to answer using a listener
 func TestServer_EndToEndStandalone(t *testing.T) {
-	totalPackets := 100 // sent per Client Thread
+	totalPackets := 5000 // sent per Client Thread
 	packetCountTest = totalPackets * threadsCountServer * len(listOfComputeIPs)
 	go createTestTLSListener(50000, t)
 
@@ -713,12 +714,39 @@ func TestServer_EndToEndStandalone(t *testing.T) {
 			testPackages[j][i] = bSphinxPacket
 		}
 	}
+
+	fmt.Println("Sending probe packets to " + strconv.Itoa(len(listOfComputeIPs)) + " compute nodes.")
+
+	for k, ip := range listOfComputeIPs {
+		for j := 0; j < threadsCountServer; j++ {
+			index := j
+			sphinxPacket := createStaticTestPacketWithPortForIndividual(t, "hello world", ip, strconv.Itoa(initialListenPort+j))
+			bSphinxPacket, err := proto.Marshal(sphinxPacket)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// waitgroup.Add(1)
+			conn := connections[k][index]
+			_, err = conn.Write(bSphinxPacket)
+			if err != nil {
+				t.Log("There is an error : ", err)
+			}
+		}
+	}
+	// waitgroup.Wait()
+
+	for probingMode == 1 {
+		time.Sleep(time.Millisecond * 100)
+	}
+
+	time.Sleep(time.Millisecond * 1000)
+	
 	fmt.Println("Sending " + strconv.Itoa(packetCountTest) + " packets to " + strconv.Itoa(len(listOfComputeIPs)) + " compute nodes.")
 	tsStart = time.Now()
 	fmt.Println("Timestamp before sending starts : ", tsStart)
 
-	//countPackets := 0
 	var waitgroup sync.WaitGroup
+
 	for k, _ := range listOfComputeIPs {
 		for j := 0; j < threadsCountServer; j++ {
 			index := j
@@ -888,6 +916,8 @@ func TestServer_AddPacketsAndRearrange(t *testing.T) {
 }
 
 func createTestTLSListener(initialListenPort int, t *testing.T) error {
+	probingMode = 1
+	
 	// receivedPackets := 0
 	receivedPackets := make([]int, threadsCountClient)
 	for j := 0; j < threadsCountClient; j++ {
@@ -956,20 +986,28 @@ func createTestTLSListener(initialListenPort int, t *testing.T) error {
 					totalReceivedPackets = totalReceivedPackets + receivedPackets[j]
 				}
 
-				// if totalReceivedPackets == int(float32(packetCountTest)*0.5) {
-				// 	fmt.Println("Received 50% of all "+strconv.Itoa(packetCountTest)+" packets at: ", time.Now())
-				// }
-				if totalReceivedPackets == int(float32(packetCountTest)*0.9) {
-					fmt.Println("Received 90% of all "+strconv.Itoa(packetCountTest)+" packets at: ", time.Now())
+				if probingMode == 1 {
+					if totalReceivedPackets == threadsCountServer * len(listOfComputeIPs) {
+						fmt.Println("Received all "+strconv.Itoa(totalReceivedPackets)+" probe packets at: ", time.Now())
+						totalReceivedPackets = 0
+						probingMode = 0
+					}
+				} else {
+					// if totalReceivedPackets == int(float32(packetCountTest)*0.5) {
+					// 	fmt.Println("Received 50% of all "+strconv.Itoa(packetCountTest)+" packets at: ", time.Now())
+					// }
+					if totalReceivedPackets == int(float32(packetCountTest)*0.9) {
+						fmt.Println("Received 90% of all "+strconv.Itoa(packetCountTest)+" packets at: ", time.Now())
+					}
+					if totalReceivedPackets == int(float32(packetCountTest)*0.999) {
+						fmt.Println("Received 90% of all "+strconv.Itoa(packetCountTest)+" packets at: ", time.Now())
+					}
+					if totalReceivedPackets == packetCountTest {
+						tsDone = time.Now()
+						fmt.Println("Received all "+strconv.Itoa(packetCountTest)+" packets at: ", tsDone)
+					}
+					//fmt.Println("Received packets: ", receivedPackets)
 				}
-				if totalReceivedPackets == int(float32(packetCountTest)*0.999) {
-					fmt.Println("Received 90% of all "+strconv.Itoa(packetCountTest)+" packets at: ", time.Now())
-				}
-				if totalReceivedPackets == packetCountTest {
-					tsDone = time.Now()
-					fmt.Println("Received all "+strconv.Itoa(packetCountTest)+" packets at: ", tsDone)
-				}
-				//fmt.Println("Received packets: ", receivedPackets)
 			}
 		}(someIndex)
 	}
