@@ -61,7 +61,7 @@ var tsStart time.Time
 var tsDone time.Time
 var probingMode int
 
-var listOfComputeIPs = [...]string{"35.173.247.172"}
+var listOfComputeIPs = [...]string{"35.173.247.172", "3.235.79.84", "3.236.82.26", "100.25.42.8", "3.236.240.223"}
 
 const (
 	testDatabase       = "testDatabase.db"
