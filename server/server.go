@@ -15,12 +15,12 @@
 package server
 
 import (
-	"fmt"
+	// "fmt"
 	"github.com/dedas111/protocolX/config"
 	"github.com/dedas111/protocolX/helpers"
 	"github.com/dedas111/protocolX/networker"
 	"github.com/dedas111/protocolX/node"
-	"github.com/dedas111/protocolX/pki"
+	// "github.com/dedas111/protocolX/pki"
 	"runtime"
 	"strings"
 
@@ -847,20 +847,20 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 	_, pres := p.connections[funnelId]
 	if !pres {
 		// check database for nodes which act as funnels
-		db, err := pki.OpenDatabase(PKI_DIR, "sqlite3")
-		if err != nil {
-			panic(err)
-		}
-		row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", strconv.Itoa(funnelId), "Provider")
+		// db, err := pki.OpenDatabase(PKI_DIR, "sqlite3")
+		// if err != nil {
+		// 	panic(err)
+		// }
+		// row := db.QueryRow("SELECT Config FROM Pki WHERE Id = ? AND Typ = ?", strconv.Itoa(funnelId), "Provider")
 
-		var results []byte
-		err = row.Scan(&results)
-		if err != nil {
-			fmt.Println(err)
-		}
+		// var results []byte
+		// err = row.Scan(&results)
+		// if err != nil {
+		// 	fmt.Println(err)
+		// }
 
-		var mixConfig config.MixConfig
-		err = proto.Unmarshal(results, &mixConfig)
+		// var mixConfig config.MixConfig
+		// err = proto.Unmarshal(results, &mixConfig)
 
 		// establish a connection with them using all available ports stated by threadsCount
 		cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs/client.pem", "/home/ec2-user/GolandProjects/protocolX/certs/client.key")
@@ -869,8 +869,8 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 		}
 		config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true, MinVersion: 2}
 
-		nodeHost := mixConfig.Host
-		intPort, _ := strconv.Atoi(mixConfig.Port)
+		nodeHost := "54.92.157.34"
+		intPort := 13000
 		p.connections[funnelId] = make([]*tls.Conn, funnelListeners)
 
 		// open connection with every available port for multithreading the ingress of funnel nodes
