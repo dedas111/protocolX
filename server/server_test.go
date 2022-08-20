@@ -61,14 +61,14 @@ var tsStart time.Time
 var tsDone time.Time
 var probingMode int
 
-var listOfComputeIPs = [...]string{"35.173.247.172", "3.235.79.84", "3.236.82.26", "100.25.42.8", "3.236.240.223"}
+var listOfComputeIPs = [...]string{"34.231.70.96", "44.204.59.99"}
 
 const (
 	testDatabase       = "testDatabase.db"
 	remoteIP           = "35.173.247.172" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
 	localIP            = "3.89.196.94" // IP of the client receiving the packets for the tests
-	threadsCountClient = 16                // listener threads on client
-	threadsCountServer = 8                // listener threads on compute/server
+	threadsCountClient = 4                // listener threads on client
+	threadsCountServer = 4                // listener threads on compute/server
 )
 
 func createTestServer() (*Server, error) {
