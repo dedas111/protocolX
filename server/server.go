@@ -884,11 +884,13 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 			conn, err := tls.Dial("tcp", nodeHost+":"+nodePort, &config)
 			if err != nil {
 				logLocal.Info("compute node: dial: ", err)
-				break
+				time.Sleep(200 * time.Millisecond)
+				// break
+			} else {
+				p.connections[funnelId][i] = conn
+				logLocal.Info("compute node: connected to funnel: ", conn.RemoteAddr())
+				i = i + 1
 			}
-			p.connections[funnelId][i] = conn
-			logLocal.Info("compute node: connected to funnel: ", conn.RemoteAddr())
-			i = i + 1
 		}
 		// state := conn.ConnectionState() Debug Info about connection
 	}
