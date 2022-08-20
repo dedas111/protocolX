@@ -67,7 +67,7 @@ const (
 	testDatabase       = "testDatabase.db"
 	remoteIP           = "18.212.178.233" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
 	localIP            = "54.91.206.62" // IP of the client receiving the packets for the tests
-	threadsCountClient = 1                // listener threads on client
+	threadsCountClient = 2                // listener threads on client
 	threadsCountServer = 1                // listener threads on compute/server
 )
 
