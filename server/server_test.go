@@ -68,8 +68,8 @@ const (
 	testDatabase       = "testDatabase.db"
 	remoteIP           = "54.92.157.34" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
 	localIP            = "44.202.124.232" // IP of the client receiving the packets for the tests
-	threadsCountClient = 4                // listener threads on client
-	threadsCountServer = 4                // listener threads on compute/server
+	threadsCountClient = 8                // listener threads on client
+	threadsCountServer = 8                // listener threads on compute/server
 )
 
 func createTestServer() (*Server, error) {
@@ -595,7 +595,7 @@ func TestServer_FunnelCapacity(t *testing.T) {
 	// time.Sleep(300 * time.Millisecond)
 	// localServer.startTlsServer()
 
-	totalPackets := 25000 // sent per Client Thread
+	totalPackets := 25000 // sent per server Thread
 	initialListenPort := 9900
 	packetCountTest = totalPackets * threadsCountServer
 	go createTestTLSListener(initialListenPort, t)
@@ -1167,6 +1167,7 @@ func createTestPacketWithoutHops(t *testing.T, payload string, port string) *con
 	// create packet
 	// bytes := make([]byte, 1000)
 	// copy(bytes, payload)
+	pld := fmt.Sprintf("%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s", payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload)
 	bytes := []byte(payload)
 	sphinxPacket := sphinx.SphinxPacket{Pld: bytes}
 	bSphinxPacket, _ := proto.Marshal(&sphinxPacket)
