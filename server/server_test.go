@@ -68,7 +68,7 @@ const (
 	remoteIP           = "35.173.247.172" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
 	localIP            = "3.89.196.94" // IP of the client receiving the packets for the tests
 	threadsCountClient = 4                // listener threads on client
-	threadsCountServer = 4                // listener threads on compute/server
+	threadsCountServer = 16                // listener threads on compute/server
 )
 
 func createTestServer() (*Server, error) {
@@ -676,7 +676,7 @@ func TestServer_FunnelCapacity(t *testing.T) {
 
 // this test sends sphinx encrypted packets to servers and expects them to answer using a listener
 func TestServer_EndToEndStandalone(t *testing.T) {
-	totalPackets := 7000 // sent per Client Thread
+	totalPackets := 5000 // sent per Client Thread
 	packetCountTest = totalPackets * threadsCountServer * len(listOfComputeIPs)
 	go createTestTLSListener(50000, t)
 
