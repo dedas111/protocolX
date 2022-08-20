@@ -150,7 +150,7 @@ func TestMix_BatchProcessPacket(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testSizes := []int{100, 1000, 2000, 3000}
+	testSizes := []int{100, 1000, 2000, 3000, 6000, 10000, 15000, 20000, 25000, 30000}
 	// testSizes := []int{2}
 	for _, testSize := range testSizes {	
 		// testSize := 2
