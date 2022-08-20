@@ -69,7 +69,7 @@ const (
 	remoteIP           = "54.92.157.34" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
 	localIP            = "44.202.124.232" // IP of the client receiving the packets for the tests
 	threadsCountClient = 8                // listener threads on client
-	threadsCountServer = 8                // listener threads on compute/server
+	threadsCountServer = 60                // listener threads on compute/server
 )
 
 func createTestServer() (*Server, error) {
@@ -595,13 +595,13 @@ func TestServer_FunnelCapacity(t *testing.T) {
 	// time.Sleep(300 * time.Millisecond)
 	// localServer.startTlsServer()
 
-	totalPackets := 100000 // sent per server Thread
+	totalPackets := 10000 // sent per server Thread
 	initialListenPort := 9900
 	packetCountTest = totalPackets * threadsCountServer
 	go createTestTLSListener(initialListenPort, t)
 	time.Sleep(1 * time.Second)
 
-	threadsCount = 8
+	threadsCount = 60
 	var connections = make([]net.Conn, threadsCount)
 
 	for i := 0; i < threadsCount; i++ {
