@@ -66,8 +66,8 @@ var listOfComputeIPs = [...]string{"44.204.59.99"}
 
 const (
 	testDatabase       = "testDatabase.db"
-	remoteIP           = "35.173.247.172" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
-	localIP            = "3.89.196.94" // IP of the client receiving the packets for the tests
+	remoteIP           = "54.92.157.34" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
+	localIP            = "44.202.124.232" // IP of the client receiving the packets for the tests
 	threadsCountClient = 4                // listener threads on client
 	threadsCountServer = 4                // listener threads on compute/server
 )
