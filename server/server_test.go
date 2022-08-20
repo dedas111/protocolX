@@ -594,13 +594,13 @@ func TestServer_FunnelCapacity(t *testing.T) {
 	// time.Sleep(300 * time.Millisecond)
 	// localServer.startTlsServer()
 
-	totalPackets := 20000 // sent per Client Thread
+	totalPackets := 5000 // sent per Client Thread
 	initialListenPort := 9900
 	packetCountTest = totalPackets * threadsCountServer
 	go createTestTLSListener(initialListenPort, t)
 	time.Sleep(1 * time.Second)
 
-	threadsCount = 4
+	threadsCount = 8
 	var connections = make([]net.Conn, threadsCount)
 
 	for i := 0; i < threadsCount; i++ {
