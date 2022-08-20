@@ -635,7 +635,7 @@ func TestServer_FunnelCapacity(t *testing.T) {
 	}
 	for j := 0; j < threadsCount; j++ {
 		for i := 0; i < totalPackets; i++ {
-			payload := fmt.Sprintf("hello world %d %d ..........................................................................................................................................................", j, i)
+			payload := fmt.Sprintf("hello world %d %d .....................................................................", j, i)
 			generalPacket := createTestPacketWithoutHops(t, payload, strconv.Itoa(initialListenPort))
 			// fmt.Println("Packet:: ", generalPacket)
 			bSphinxPacket, err := proto.Marshal(generalPacket)
