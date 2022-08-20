@@ -595,7 +595,7 @@ func TestServer_FunnelCapacity(t *testing.T) {
 	// time.Sleep(300 * time.Millisecond)
 	// localServer.startTlsServer()
 
-	totalPackets := 25000 // sent per server Thread
+	totalPackets := 10000 // sent per server Thread
 	initialListenPort := 9900
 	packetCountTest = totalPackets * threadsCountServer
 	go createTestTLSListener(initialListenPort, t)
@@ -1168,7 +1168,7 @@ func createTestPacketWithoutHops(t *testing.T, payload string, port string) *con
 	// bytes := make([]byte, 1000)
 	// copy(bytes, payload)
 	pld := fmt.Sprintf("%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s", payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload)
-	bytes := []byte(payload)
+	bytes := []byte(pld)
 	sphinxPacket := sphinx.SphinxPacket{Pld: bytes}
 	bSphinxPacket, _ := proto.Marshal(&sphinxPacket)
 	nexthop := fmt.Sprintf("%s:%s", localIP, port)
