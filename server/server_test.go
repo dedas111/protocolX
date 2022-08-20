@@ -61,15 +61,15 @@ var tsStart time.Time
 var tsDone time.Time
 var probingMode int
 
-var listOfComputeIPs = [...]string{"34.231.70.96", "44.204.59.99"}
+var listOfComputeIPs = [...]string{"3.86.203.200"}
 // var listOfComputeIPs = [...]string{"44.204.59.99"}
 
 const (
 	testDatabase       = "testDatabase.db"
 	remoteIP           = "54.92.157.34" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
-	localIP            = "44.202.124.232" // IP of the client receiving the packets for the tests
+	localIP            = "34.207.125.78" // IP of the client receiving the packets for the tests
 	threadsCountClient = 8                // listener threads on client
-	threadsCountServer = 60                // listener threads on compute/server
+	threadsCountServer = 16                // listener threads on compute/server
 )
 
 func createTestServer() (*Server, error) {
@@ -601,7 +601,7 @@ func TestServer_FunnelCapacity(t *testing.T) {
 	go createTestTLSListener(initialListenPort, t)
 	time.Sleep(1 * time.Second)
 
-	threadsCount = 60
+	threadsCount = 16
 	var connections = make([]net.Conn, threadsCount)
 
 	for i := 0; i < threadsCount; i++ {
