@@ -62,6 +62,7 @@ var (
 	lbCtr            = 0
 	emptyCtr         = 0
 	numOfFunnels     = 1
+	funnelId         = 0
 	computeListeners = 16
 	funnelListeners  = 16
 
@@ -210,7 +211,8 @@ func (p *Server) receivedPacketWithIndex(packet []byte, someIndex int) error {
 		*/
 	} else { //compute node functionality
 		// logLocal.Info("compute functionality")
-		funnelId := p.establishConnectionToRandomFunnel()
+		// funnelId := p.establishConnectionToRandomFunnel()
+		// funnelId := 0
 
 		newPacket, err := p.ProcessPacketInSameThread(packet)
 		if err != nil {
@@ -833,7 +835,7 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 
 	// --- THIS HAS TO BE REMOVED AFTERWARDS ---
 
-	funnelId := int(config.GetRound()) % numOfFunnels
+	funnelId = int(config.GetRound()) % numOfFunnels
 
 	// --- THIS HAS TO BE REMOVED AFTERWARDS ---
 
@@ -882,6 +884,7 @@ func (p *Server) establishConnectionToRandomFunnel() int {
 			conn, err := tls.Dial("tcp", nodeHost+":"+nodePort, &config)
 			if err != nil {
 				logLocal.Info("compute node: dial: ", err)
+				break
 			}
 			p.connections[funnelId][i] = conn
 			logLocal.Info("compute node: connected to funnel: ", conn.RemoteAddr())
@@ -955,6 +958,7 @@ func (p *Server) sendOutboundFunnelMessages() {
 			}
 		}
 	} else {
+		funnelId = p.establishConnectionToRandomFunnel()
 		logLocal.Info("-------------------------------------------------------------")
 		logLocal.Info("Relayed packets: ", relayedPackets)
 		logLocal.Info("Delivered packets: ", messageDelivered)
