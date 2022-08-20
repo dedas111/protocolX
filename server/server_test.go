@@ -635,7 +635,7 @@ func TestServer_FunnelCapacity(t *testing.T) {
 	}
 	for j := 0; j < threadsCount; j++ {
 		for i := 0; i < totalPackets; i++ {
-			payload := fmt.Sprintf("hello world %d %d .....................................", j, i)
+			payload := fmt.Sprintf("hello world %d %d ..........................................................................................................................................................", j, i)
 			generalPacket := createTestPacketWithoutHops(t, payload, strconv.Itoa(initialListenPort))
 			// fmt.Println("Packet:: ", generalPacket)
 			bSphinxPacket, err := proto.Marshal(generalPacket)
@@ -1167,8 +1167,8 @@ func createTestPacketWithoutHops(t *testing.T, payload string, port string) *con
 	// create packet
 	// bytes := make([]byte, 1000)
 	// copy(bytes, payload)
-	pld := fmt.Sprintf("%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s", payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload)
-	bytes := []byte(pld)
+	// pld := fmt.Sprintf("%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s", payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload, payload)
+	bytes := []byte(payload)
 	sphinxPacket := sphinx.SphinxPacket{Pld: bytes}
 	bSphinxPacket, _ := proto.Marshal(&sphinxPacket)
 	nexthop := fmt.Sprintf("%s:%s", localIP, port)
