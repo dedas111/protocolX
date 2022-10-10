@@ -69,6 +69,7 @@ var (
 	// clientAddr       = "10.20.30.40:65"
 
 	logLocal = logging.PackageLogger()
+	rwMutex = sync.RWMutex{}
 )
 
 const (
@@ -496,29 +497,38 @@ func (p *Server) relayPacketAsFunnel(lbCtr int, packetBytes []byte) {
 		dstAddr := dstIp + strconv.Itoa(nextHopPortInt+lbCtr)
 
 		// save connection to map if it doesn't exist
+		rwMutex.RLock()
 		conn, pres := p.connectionsToCompute[dstAddr]
 
 		if !pres {
+			rwMutex.Lock()
 			cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs/client.pem", "/home/ec2-user/GolandProjects/protocolX/certs/client.key")
 			if err != nil {
 				logLocal.Info("compute node: loadkeys: ", err)
 			}
 			config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true, MinVersion: 2}
-			conn, err := tls.Dial("tcp", dstAddr, &config)
+			conn, err = tls.Dial("tcp", dstAddr, &config)
 			if err != nil {
 				logLocal.Error("Couldn't create TLS connection with peer.", dstAddr)
 				logLocal.Error(err)
 			}
 			p.connectionsToCompute[dstAddr] = conn
-			conn.Write(computePacket.Data)
-			if err != nil {
-				logLocal.Error("Error sending packet to compute.", err)
-			}
-		} else {
-			_, err := conn.Write(computePacket.Data)
-			if err != nil {
-				logLocal.Error("Error sending packet to compute.", err)
-			}
+			rwMutex.Unlock()
+		// 	conn.Write(computePacket.Data)
+		// 	if err != nil {
+		// 		logLocal.Error("Error sending packet to compute.", err)
+		// 	}
+		// } else {
+		// 	_, err := conn.Write(computePacket.Data)
+		// 	if err != nil {
+		// 		logLocal.Error("Error sending packet to compute.", err)
+		// 	}
+		}
+		rwMutex.RUnlock()
+
+		_, err = conn.Write(computePacket.Data)
+		if err != nil {
+			logLocal.Error("Error sending packet to compute.", err)
 		}
 		//logLocal.Info("Next Hop old: ", computePacket.NextHop)
 		//logLocal.Info("Next Hop new: ", dstAddr)
