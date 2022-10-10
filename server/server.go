@@ -967,7 +967,7 @@ func (p *Server) sendOutboundFunnelMessages() {
 					time.Sleep(time.Millisecond * 1)
 					startingIndex := threadIndex * totalPackets/16
 					endingIndex := helpers.Min((threadIndex +1) * totalPackets/16, totalPackets)
-					logLocal.Info("j: ", j)
+					logLocal.Info("threadIndex: ", threadIndex)
 					logLocal.Info("startingIndex: ", startingIndex)
 					logLocal.Info("endingIndex: ", endingIndex)
 					for i := startingIndex; i < endingIndex; i++ {
