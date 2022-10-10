@@ -601,7 +601,7 @@ func TestServer_FunnelCapacity(t *testing.T) {
 	go createTestTLSListener(initialListenPort, t)
 	time.Sleep(1 * time.Second)
 
-	threadsCount = 70
+	threadsCount = 16
 	var connections = make([]net.Conn, threadsCount)
 
 	for i := 0; i < threadsCount; i++ {
