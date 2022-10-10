@@ -960,9 +960,9 @@ func (p *Server) sendOutboundFunnelMessages() {
 			// startingIndex := 0
 			var waitgroup sync.WaitGroup
 			for j:= 0; j < 16; j++ {
+				threadIndex := j
 				waitgroup.Add(1)
 				go func(){
-					threadIndex := j
 					defer waitgroup.Done()
 					time.Sleep(time.Millisecond * 1)
 					startingIndex := threadIndex * totalPackets/16
