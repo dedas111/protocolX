@@ -962,14 +962,14 @@ func (p *Server) sendOutboundFunnelMessages() {
 				go func(){
 					threadIndex := j
 					time.Sleep(time.Millisecond * 1)
-					startingIndex := threadndex * totalPackets/16
+					startingIndex := threadIndex * totalPackets/16
 					endingIndex := helpers.min((threadIndex +1) * totalPackets/16, totalPackets)
 					for i := startingIndex; i < endingIndex; i++ {
 						packet := outboundPackets[i]
 						p.relayPacketAsFunnel(threadIndex, packet)
 					}
 					relayedPackets += (endingIndex - startingIndex)
-				}
+				}()
 			}
 			// go func(){
 			// 	for i := 1; i < totalPackets/8; i++ {
