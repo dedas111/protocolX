@@ -958,9 +958,12 @@ func (p *Server) sendOutboundFunnelMessages() {
 			// }
 
 			// startingIndex := 0
+			var waitgroup sync.WaitGroup
 			for j:= 0; j < 16; j++ {
+				waitgroup.Add(1)
 				go func(){
 					threadIndex := j
+					defer waitgroup.Done()
 					time.Sleep(time.Millisecond * 1)
 					startingIndex := threadIndex * totalPackets/16
 					endingIndex := helpers.Min((threadIndex +1) * totalPackets/16, totalPackets)
@@ -971,6 +974,7 @@ func (p *Server) sendOutboundFunnelMessages() {
 					relayedPackets += (endingIndex - startingIndex)
 				}()
 			}
+			waitgroup.Wait()
 			// go func(){
 			// 	for i := 1; i < totalPackets/8; i++ {
 			// 		packet := outboundPackets[i]
