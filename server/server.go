@@ -59,7 +59,7 @@ var (
 	msgCount         = 500000
 	threadsCount     = 1 // gets overridden by amount of system cores
 	staticServerRole = ""
-	lbCtr            = 0
+	// lbCtr            = 0
 	emptyCtr         = 0
 	numOfFunnels     = 1
 	funnelId         = 0
@@ -459,7 +459,7 @@ func (p *Server) relayPacket() error {
 	}
 }
 
-func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
+func (p *Server) relayPacketAsFunnel(lbCtr int, packetBytes []byte) {
 	// unmarshal into general packet
 	var generalPacket config.GeneralPacket
 	err := proto.Unmarshal(packetBytes, &generalPacket)
@@ -491,9 +491,9 @@ func (p *Server) relayPacketAsFunnel(packetBytes []byte) {
 	}
 
 	if nextHopPortInt < 50000 && nextHopPortInt >= 9900 { // hardcoded portrange for protocol for now
-		dstAddr := dstIp + strconv.Itoa(nextHopPortInt+lbCtr)
 		// for this to work, every server has to have the same amount of threads
-		lbCtr = (lbCtr + 1) % computeListeners
+		lbCtr = lbCtr % computeListeners
+		dstAddr := dstIp + strconv.Itoa(nextHopPortInt+lbCtr)
 
 		// save connection to map if it doesn't exist
 		conn, pres := p.connectionsToCompute[dstAddr]
@@ -946,18 +946,63 @@ func (p *Server) sendOutboundFunnelMessages() {
 	if isMapper {
 		// reduce dimension of outbound packet array
 		outboundPackets := p.rearrangeReceivedPackets()
-		logLocal.Info("Outbound packets: ", len(outboundPackets))
+		totalPackets := len(outboundPackets)
+		logLocal.Info("Outbound packets: ", totalPackets)
 		logLocal.Info("System time now: ", time.Now())
-		if len(outboundPackets) > 0 {
+		if totalPackets > 0 {
 			// relay packets here if funnel
-			if isMapper {
-				for _, packet := range outboundPackets {
-					p.relayPacketAsFunnel(packet)
-					relayedPackets++
+			// if isMapper {
+			// for _, packet := range outboundPackets {
+			// 	p.relayPacketAsFunnel(packet)
+			// 	relayedPackets++
+			// }
+
+			// startingIndex := 0
+			for j:= 0; j < 16; j++ {
+				go func(){
+					threadIndex := j
+					time.Sleep(time.Millisecond * 1)
+					startingIndex := threadndex * totalPackets/16
+					endingIndex := helpers.min((threadIndex +1) * totalPackets/16, totalPackets)
+					for i := startingIndex; i < endingIndex; i++ {
+						packet := outboundPackets[i]
+						p.relayPacketAsFunnel(threadIndex, packet)
+					}
+					relayedPackets += (endingIndex - startingIndex)
 				}
-				logLocal.Info("Sent all as funnel. Time: " , time.Now())
-				logLocal.Info("Relayed packets: ", relayedPackets)
 			}
+			// go func(){
+			// 	for i := 1; i < totalPackets/8; i++ {
+			// 		packet := outboundPackets[i]
+			// 		p.relayPacketAsFunnel(packet)
+			// 	}
+			// 	relayedPackets += totalPackets/8
+			// }
+			// go func(){
+			// 	for i := totalPackets/8; i < totalPackets/4; i++ {
+			// 		packet := outboundPackets[i]
+			// 		p.relayPacketAsFunnel(packet)
+			// 	}
+			// 	relayedPackets += totalPackets/8
+			// }
+			// go func(){
+			// 	for i := totalPackets/4; i < 3 * totalPackets/8; i++ {
+			// 		packet := outboundPackets[i]
+			// 		p.relayPacketAsFunnel(packet)
+			// 	}
+			// 	relayedPackets += totalPackets/8
+			// }
+			// go func(){
+			// 	for i := totalPackets/4; i < 3 * totalPackets/8; i++ {
+			// 		packet := outboundPackets[i]
+			// 		p.relayPacketAsFunnel(packet)
+			// 	}
+			// 	relayedPackets += totalPackets/8
+			// }
+			
+			logLocal.Info("Sent all as funnel. Time: " , time.Now())
+			logLocal.Info("Relayed packets: ", relayedPackets)
+			// }
 		}
 	} else {
 		funnelId = p.establishConnectionToRandomFunnel()

@@ -260,3 +260,10 @@ func RemoveIndexFromSlice(slice []int, indexToRemove int) {
 	slice[len(slice)-1] = 0
 	slice = slice[:len(slice)-1]
 }
+
+func min(a, b int) int {
+    if a < b {
+        return a
+    }
+    return b
+}
