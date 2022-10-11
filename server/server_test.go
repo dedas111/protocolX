@@ -61,8 +61,8 @@ var tsStart time.Time
 var tsDone time.Time
 var probingMode int
 
-var listOfComputeIPs = [...]string{"3.92.229.103"}
-// var listOfComputeIPs = [...]string{"44.204.59.99"}
+// var listOfComputeIPs = [...]string{"3.92.229.103"}
+var listOfComputeIPs = [...]string{"44.211.213.238","54.163.13.8"}
 
 const (
 	testDatabase       = "testDatabase.db"
@@ -677,7 +677,7 @@ func TestServer_FunnelCapacity(t *testing.T) {
 
 // this test sends sphinx encrypted packets to servers and expects them to answer using a listener
 func TestServer_EndToEndStandalone(t *testing.T) {
-	totalPackets := 3200 // sent per Client Thread
+	totalPackets := 1000 // sent per Client Thread
 	packetCountTest = totalPackets * threadsCountServer * len(listOfComputeIPs)
 	go createTestTLSListener(50000, t)
 
