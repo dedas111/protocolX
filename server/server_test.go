@@ -1146,7 +1146,7 @@ func createStaticTestPacketWithPortForIndividual(t *testing.T, payload string, i
 	clientConfig := config.ClientConfig{Id: "1", Host: localIP, Port: port, Provider: &localServer.config}
 
 	// create packet
-	path := config.E2EPath{IngressProvider: computeConfig, Mixes: []config.MixConfig{computeConfig, computeConfig, computeConfig, computeConfig, computeConfig, computeConfig}, EgressProvider: computeConfig, Recipient: clientConfig}
+	path := config.E2EPath{IngressProvider: computeConfig, Mixes: []config.MixConfig{computeConfig, computeConfig, computeConfig, computeConfig, computeConfig, computeConfig, computeConfig, computeConfig, computeConfig}, EgressProvider: computeConfig, Recipient: clientConfig}
 	sphinxPacket, err := sphinx.PackForwardMessage(curve, path, []float64{0.1, 0.2, 0.3, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1}, payload)
 	if err != nil {
 		t.Fatal(err)
