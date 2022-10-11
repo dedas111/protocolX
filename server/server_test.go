@@ -608,7 +608,7 @@ func TestServer_FunnelCapacity(t *testing.T) {
 	for i := 0; i < threadsCount; i++ {
 		t.Log("After the server starts")
 		// time.Sleep(20 * time.Millisecond)
-		port := 9930 + i
+		port := 13000 + i
 		connections[i] = createTlsConnectionToIndividual("172.31.73.169", port, t)
 		// connections[i] = createTlsConnection(port, t)
 		if connections[i] == nil {
