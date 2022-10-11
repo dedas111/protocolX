@@ -63,7 +63,7 @@ var (
 	emptyCtr         = 0
 	numOfFunnels     = 1
 	funnelId         = 0
-	computeListeners = 16
+	computeListeners = 8
 	funnelListeners  = 16
 
 	// clientAddr       = "10.20.30.40:65"
