@@ -501,7 +501,6 @@ func (p *Server) relayPacketAsFunnel(lbCtr int, packetBytes []byte) {
 		// rwMutex.RLock()
 		// conn, pres := p.connectionsToCompute[dstAddr]
 		connInterface, pres := p.connectionsToCompute.Load(dstAddr)
-		conn := connInterface.(*tls.Conn)
 
 		if !pres {
 			// rwMutex.Lock()
@@ -510,7 +509,7 @@ func (p *Server) relayPacketAsFunnel(lbCtr int, packetBytes []byte) {
 				logLocal.Info("compute node: loadkeys: ", err)
 			}
 			config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true, MinVersion: 2}
-			conn, err = tls.Dial("tcp", dstAddr, &config)
+			conn, err := tls.Dial("tcp", dstAddr, &config)
 			if err != nil {
 				logLocal.Error("Couldn't create TLS connection with peer.", dstAddr)
 				logLocal.Error(err)
@@ -523,6 +522,7 @@ func (p *Server) relayPacketAsFunnel(lbCtr int, packetBytes []byte) {
 				logLocal.Error("Error sending packet to compute.", err)
 			}
 		} else {
+			conn := connInterface.(*tls.Conn)
 			_, err := conn.Write(computePacket.Data)
 			if err != nil {
 				logLocal.Error("Error sending packet to compute.", err)
