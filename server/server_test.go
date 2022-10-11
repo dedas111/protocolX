@@ -678,7 +678,7 @@ func TestServer_FunnelCapacity(t *testing.T) {
 
 // this test sends sphinx encrypted packets to servers and expects them to answer using a listener
 func TestServer_EndToEndStandalone(t *testing.T) {
-	totalPackets := 3000 // sent per Client Thread
+	totalPackets := 2500 // sent per Client Thread
 	packetCountTest = totalPackets * threadsCountServer * len(listOfComputeIPs)
 	go createTestTLSListener(50000, t)
 
