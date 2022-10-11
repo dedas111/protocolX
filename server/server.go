@@ -69,7 +69,7 @@ var (
 	// clientAddr       = "10.20.30.40:65"
 
 	logLocal = logging.PackageLogger()
-	rwMutex = sync.RWMutex{}
+	// rwMutex = sync.RWMutex{}
 )
 
 const (
@@ -103,7 +103,8 @@ type Server struct {
 	indexSinceLastRelay []int // used by funnel to determine which packets are new
 
 	connections          map[int][]*tls.Conn  // TLS connections to funnels
-	connectionsToCompute map[string]*tls.Conn // TLS connections to compute nodes
+	// connectionsToCompute Map[string]*tls.Conn // TLS connections to compute nodes
+	connectionsToCompute sync.Map // TLS connections to compute nodes
 	connectionsToClients map[string]*tls.Conn // TLS connections to clients
 }
 
@@ -497,11 +498,13 @@ func (p *Server) relayPacketAsFunnel(lbCtr int, packetBytes []byte) {
 		dstAddr := dstIp + strconv.Itoa(nextHopPortInt+lbCtr)
 
 		// save connection to map if it doesn't exist
-		rwMutex.RLock()
-		conn, pres := p.connectionsToCompute[dstAddr]
+		// rwMutex.RLock()
+		// conn, pres := p.connectionsToCompute[dstAddr]
+		connInterface, pres := p.connectionsToCompute.Load(dstAddr)
+		conn := connInterface.(*tls.Conn)
 
 		if !pres {
-			rwMutex.Lock()
+			// rwMutex.Lock()
 			cert, err := tls.LoadX509KeyPair("/home/ec2-user/GolandProjects/protocolX/certs/client.pem", "/home/ec2-user/GolandProjects/protocolX/certs/client.key")
 			if err != nil {
 				logLocal.Info("compute node: loadkeys: ", err)
@@ -512,24 +515,25 @@ func (p *Server) relayPacketAsFunnel(lbCtr int, packetBytes []byte) {
 				logLocal.Error("Couldn't create TLS connection with peer.", dstAddr)
 				logLocal.Error(err)
 			}
-			p.connectionsToCompute[dstAddr] = conn
-			rwMutex.Unlock()
-		// 	conn.Write(computePacket.Data)
-		// 	if err != nil {
-		// 		logLocal.Error("Error sending packet to compute.", err)
-		// 	}
-		// } else {
-		// 	_, err := conn.Write(computePacket.Data)
-		// 	if err != nil {
-		// 		logLocal.Error("Error sending packet to compute.", err)
-		// 	}
+			// p.connectionsToCompute[dstAddr] = conn
+			// rwMutex.Unlock()
+			p.connectionsToCompute.Store(dstAddr, conn)
+			conn.Write(computePacket.Data)
+			if err != nil {
+				logLocal.Error("Error sending packet to compute.", err)
+			}
+		} else {
+			_, err := conn.Write(computePacket.Data)
+			if err != nil {
+				logLocal.Error("Error sending packet to compute.", err)
+			}
 		}
-		rwMutex.RUnlock()
+		// rwMutex.RUnlock()
 
-		_, err = conn.Write(computePacket.Data)
-		if err != nil {
-			logLocal.Error("Error sending packet to compute.", err)
-		}
+		// _, err = conn.Write(computePacket.Data)
+		// if err != nil {
+		// 	logLocal.Error("Error sending packet to compute.", err)
+		// }
 		//logLocal.Info("Next Hop old: ", computePacket.NextHop)
 		//logLocal.Info("Next Hop new: ", dstAddr)
 		//p.forwardPacketTLS(computePacket.Data, dstAddr) // data in computePacket is a SphinxPacket
@@ -808,7 +812,7 @@ func NewServer(id string, host string, port string, pubKey []byte, prvKey []byte
 	server.config = config.MixConfig{Id: server.id, Host: server.host, Port: server.port, PubKey: server.GetPublicKey()}
 	server.assignedClients = make(map[string]ClientRecord)
 	server.connections = make(map[int][]*tls.Conn)
-	server.connectionsToCompute = make(map[string]*tls.Conn)
+	// server.connectionsToCompute = make(map[string]*tls.Conn)
 	server.connectionsToClients = make(map[string]*tls.Conn)
 
 	threadsCount = runtime.NumCPU()
