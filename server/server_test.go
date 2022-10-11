@@ -434,7 +434,7 @@ func TestServer_TlsConnectionReceive(t *testing.T) {
 		t.Log("After the server starts")
 		// time.Sleep(20 * time.Millisecond)
 		port := 9900 + i
-		connections[i] = createTlsConnectionToIndividual(localIP, port, t)
+		connections[i] = createTlsConnectionToIndividual("172.31.73.169", port, t)
 		if connections[i] == nil {
 			t.Log("Conn is nil")
 			// retunr nil
