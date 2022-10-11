@@ -130,7 +130,7 @@ func TestMix_BatchProcessPacket(t *testing.T) {
 	if testing.Short() {
         t.Skip("skipping test in short mode.")
     }
-	threads := runtime.GOMAXPROCS(6)
+	threads := runtime.GOMAXPROCS(0)
 	t.Log("test: the total number of threads used : ", threads)
 	// logLocal.Info("main: case client:  the total number of threads used : ", threads)
 

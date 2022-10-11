@@ -427,14 +427,14 @@ func TestServer_TlsConnectionReceive(t *testing.T) {
 	// time.Sleep(300 * time.Millisecond)
 	// localServer.startTlsServer()
 
-	threadsCount = 2
+	threadsCount = 8
 	var connections = make([]net.Conn, threadsCount)
 
 	for i := 0; i < threadsCount; i++ {
 		t.Log("After the server starts")
 		// time.Sleep(20 * time.Millisecond)
 		port := 9900 + i
-		connections[i] = createTlsConnection(port, t)
+		connections[i] = createTlsConnectionToIndividual(localIP, port, t)
 		if connections[i] == nil {
 			t.Log("Conn is nil")
 			// retunr nil
