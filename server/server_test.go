@@ -69,7 +69,7 @@ const (
 	remoteIP           = "54.92.157.34" // remote IP of compute for testing - not needed for standalone test because it uses multiple compute nodes
 	localIP            = "3.92.229.103" // IP of the client receiving the packets for the tests
 	threadsCountClient = 16                // listener threads on client
-	threadsCountServer = 16                // listener threads on compute/server
+	threadsCountServer = 4                // listener threads on compute/server
 )
 
 func createTestServer() (*Server, error) {
